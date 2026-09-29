@@ -1,0 +1,35 @@
+name: Build Web (PWA)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}   # permite lanzarlo manualmente desde la pestaña Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.5'
+          channel: 'stable'
+
+      - name: Instalar dependencias del proyecto
+        run: flutter pub get
+
+      # --no-web-resources-cdn: la build queda sirviendo su propio CanvasKit
+      # en vez de bajarlo de Google en cada carga — importante para que la
+      # PWA funcione también con conexión limitada/filtrada en el celular
+      # del vendedor. Ver README.md "Build web / PWA".
+      - name: Compilar la build web (PWA)
+        run: flutter build web --release --no-web-resources-cdn
+
+      - name: Subir la build web como artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: cotizador-icr-web
+          path: build/web

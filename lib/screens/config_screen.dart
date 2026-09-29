@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/db_helper.dart';
+import '../services/erp_config_service.dart';
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -10,8 +10,8 @@ class ConfigScreen extends StatefulWidget {
 }
 
 class _ConfigScreenState extends State<ConfigScreen> {
-  final _ipController = TextEditingController();
-  final _puertoController = TextEditingController(text: '3000');
+  final _urlController = TextEditingController();
+  final _tokenController = TextEditingController();
   bool _sincronizando = false;
   String? _mensaje;
   bool _mensajeOk = false;
@@ -20,25 +20,24 @@ class _ConfigScreenState extends State<ConfigScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarPrefs();
+    _cargarConfig();
   }
 
-  Future<void> _cargarPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    _ipController.text = prefs.getString('server_ip') ?? '';
-    _puertoController.text = prefs.getString('server_port') ?? '3000';
+  Future<void> _cargarConfig() async {
+    _urlController.text = await ErpConfigService.getBaseUrl() ?? '';
+    _tokenController.text = await ErpConfigService.getToken() ?? '';
     final total = await DbHelper.instance.countTotal();
     if (!mounted) return;
     setState(() => _totalLocal = total);
   }
 
   Future<void> _sincronizar() async {
-    final ip = _ipController.text.trim();
-    final puerto = _puertoController.text.trim();
+    final baseUrl = _urlController.text.trim().replaceAll(RegExp(r'/+$'), '');
+    final token = _tokenController.text.trim();
 
-    if (ip.isEmpty) {
+    if (baseUrl.isEmpty || token.isEmpty) {
       setState(() {
-        _mensaje = 'Ingresa la IP de tu máquina.';
+        _mensaje = 'Completa la URL del ERP y el token de servicio.';
         _mensajeOk = false;
       });
       return;
@@ -49,19 +48,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _mensaje = null;
     });
 
-    final baseUrl = 'http://$ip:$puerto';
-
     try {
-      final productos = await ApiService.obtenerTodos(baseUrl);
+      final productos = await ApiService.obtenerTodos(baseUrl, token);
       await DbHelper.instance.replaceAll(productos);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('server_ip', ip);
-      await prefs.setString('server_port', puerto);
+      await ErpConfigService.guardar(baseUrl: baseUrl, token: token);
 
       if (!mounted) return;
       setState(() {
-        _mensaje = 'Sincronizado: ${productos.length} productos.';
+        _mensaje = 'Sincronizado con el ERP: ${productos.length} productos.';
         _mensajeOk = true;
         _totalLocal = productos.length;
       });
@@ -69,7 +63,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       if (!mounted) return;
       setState(() {
         _mensaje =
-            'No se pudo conectar. Revisa que el celular esté en la misma red WiFi que tu PC y que el servidor (npm start) esté corriendo.\n\nDetalle: $e';
+            'No se pudo conectar con el ERP. Revisa la URL, el token de servicio y tu conexión.\n\nDetalle: $e';
         _mensajeOk = false;
       });
     } finally {
@@ -79,45 +73,46 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   @override
   void dispose() {
-    _ipController.dispose();
-    _puertoController.dispose();
+    _urlController.dispose();
+    _tokenController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sincronizar catálogo')),
+      appBar: AppBar(title: const Text('Conexión con el ERP')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Productos guardados en este celular: $_totalLocal'),
+            Text('Productos guardados en este dispositivo: $_totalLocal'),
             const SizedBox(height: 20),
             const Text(
-              'Escribe la IP local de la PC donde corre tu servidor '
-              '(la ves con "ipconfig" en Windows, busca "Dirección IPv4"). '
-              'El celular debe estar conectado al mismo WiFi que la PC.',
+              'Conecta esta app al ERP real de Inversiones ICR (ICR-LOGISTICA). '
+              'El token de servicio se genera desde el ERP en '
+              'Administración → Tokens de servicio, eligiendo un usuario con rol VENTAS.',
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _ipController,
+              controller: _urlController,
               decoration: const InputDecoration(
-                labelText: 'IP de tu máquina',
-                hintText: 'Ej. 192.168.1.15',
+                labelText: 'URL de la API del ERP',
+                hintText: 'https://erp.inversionesicr.com/api',
                 border: OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.url,
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _puertoController,
+              controller: _tokenController,
               decoration: const InputDecoration(
-                labelText: 'Puerto',
+                labelText: 'Token de servicio',
+                hintText: 'icr_...',
                 border: OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number,
+              obscureText: true,
             ),
             const SizedBox(height: 20),
             FilledButton.icon(

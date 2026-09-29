@@ -19,6 +19,7 @@ dependencies:
   printing: ^5.13.1
   intl: ^0.19.0
   cupertino_icons: ^1.0.6
+  sqflite_common_ffi_web: ^1.0.2
 
 dev_dependencies:
   flutter_test:
@@ -40,3 +41,16 @@ flutter:
     - assets/productos_seed.json
     - assets/productos/
     - assets/icon/icon.png
+  # Empaquetada localmente (no vía Google Fonts en tiempo de ejecución) para
+  # que el texto se vea en la build web/PWA aunque el navegador no pueda
+  # llegar a fonts.gstatic.com (red restringida, filtro corporativo, sin
+  # señal) — mismo criterio "funciona sin depender de internet" que ya
+  # aplica al catálogo offline y a la generación del PDF.
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700

@@ -1,0 +1,38 @@
+services:
+  cotizador:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: cotizador-icr:latest
+    restart: unless-stopped
+    networks:
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      # Debe ser el nombre REAL de la red de Docker (n8n_default), no el
+      # alias "traefik_public" que solo existe dentro de este compose — con
+      # el alias, Traefik nunca encuentra la red y el dominio se queda sin
+      # certificado real (sirve el autofirmado por defecto). Mismo hallazgo
+      # que en ICR-TIENDA/docker-compose.yml.
+      - "traefik.docker.network=n8n_default"
+      # HTTP -> HTTPS redirect
+      - "traefik.http.routers.cotizador-icr-http.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.cotizador-icr-http.entrypoints=web"
+      - "traefik.http.routers.cotizador-icr-http.middlewares=cotizador-icr-https-redirect"
+      - "traefik.http.middlewares.cotizador-icr-https-redirect.redirectscheme.scheme=https"
+      # HTTPS with Let's Encrypt
+      - "traefik.http.routers.cotizador-icr.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.cotizador-icr.entrypoints=websecure"
+      - "traefik.http.routers.cotizador-icr.tls=true"
+      # "letsencrypt" no existe como certResolver en el Traefik de este
+      # VPS — el único definido es "mytlschallenge" (ver docker-compose.yml
+      # de ICR-TIENDA para el mismo hallazgo).
+      - "traefik.http.routers.cotizador-icr.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.cotizador-icr.loadbalancer.server.port=80"
+
+networks:
+  # Misma red compartida de Traefik que ya usan el ERP y la tienda en este
+  # VPS (n8n_default) — no una red "traefik_public" separada.
+  traefik_public:
+    name: n8n_default
+    external: true

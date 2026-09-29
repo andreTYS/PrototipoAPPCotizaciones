@@ -1,11 +1,22 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'services/db_helper.dart';
 import 'state/cotizacion_state.dart';
 import 'screens/main_tabs_screen.dart';
 import 'theme/brand_colors.dart';
 
 void main() {
+  // sqflite no tiene implementación nativa en navegador — en la build web
+  // (PWA) se guarda igual en el propio navegador (IndexedDB vía sqlite3
+  // compilado a WebAssembly), así que el catálogo sincronizado y el
+  // historial de cotizaciones siguen persistiendo entre sesiones ahí
+  // también, sin tocar ninguna pantalla ni el resto de DbHelper.
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  }
   runApp(const CotizadorApp());
 }
 
@@ -32,6 +43,10 @@ class CotizadorApp extends StatelessWidget {
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: colorScheme,
+          // Roboto empaquetada localmente (ver pubspec.yaml) en vez de la
+          // que Flutter Material pide por defecto a fonts.gstatic.com — la
+          // build web/PWA no debe depender de esa red para poder leer texto.
+          fontFamily: 'Roboto',
           appBarTheme: const AppBarTheme(
             backgroundColor: BrandColors.azulMarino,
             foregroundColor: Colors.white,

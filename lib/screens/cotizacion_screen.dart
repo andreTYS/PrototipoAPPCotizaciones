@@ -3,7 +3,9 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cotizacion_guardada.dart';
+import '../services/api_service.dart';
 import '../services/db_helper.dart';
+import '../services/erp_config_service.dart';
 import '../services/pdf_service.dart';
 import '../state/cotizacion_state.dart';
 import '../widgets/brand_app_bar_title.dart';
@@ -99,6 +101,17 @@ class _CotizacionScreenState extends State<CotizacionScreen> {
         bytes: bytes,
         filename: 'cotizacion_${PdfService.formatearNumero(numero)}.pdf',
       );
+
+      // El PDF ya se generó y compartió — enviar al CRM es un extra que
+      // nunca debe deshacer ni bloquear lo anterior si falla (sin señal,
+      // ERP sin configurar, token vencido).
+      await _enviarLeadAlErp(
+        cliente: cliente,
+        rucDni: rucDni,
+        numero: PdfService.formatearNumero(numero),
+        items: cotizacion.items,
+        total: cotizacion.totalGeneral,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -107,6 +120,62 @@ class _CotizacionScreenState extends State<CotizacionScreen> {
     } finally {
       if (mounted) setState(() => _generando = false);
     }
+  }
+
+  Future<void> _enviarLeadAlErp({
+    required String cliente,
+    required String rucDni,
+    required String numero,
+    required List<ItemCotizacion> items,
+    required double total,
+  }) async {
+    if (!await ErpConfigService.estaConfigurado()) {
+      // No es un error: simplemente no se configuró el ERP todavía (ver
+      // Conexión con el ERP). El PDF ya se generó y compartió igual.
+      return;
+    }
+    final baseUrl = await ErpConfigService.getBaseUrl();
+    final token = await ErpConfigService.getToken();
+    try {
+      await ApiService.enviarLeadCotizacion(
+        baseUrl: baseUrl!,
+        token: token!,
+        cliente: cliente,
+        rucDni: rucDni,
+        notas: _notasParaElCrm(numero: numero, items: items, total: total),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cotización $numero enviada también al CRM del ERP.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('El PDF se generó bien, pero no se pudo enviar al CRM: $e')),
+      );
+    }
+  }
+
+  String _notasParaElCrm({
+    required String numero,
+    required List<ItemCotizacion> items,
+    required double total,
+  }) {
+    final buffer = StringBuffer()
+      ..writeln('Cotización de campo $numero (app Cotizador ICR)')
+      ..writeln();
+    for (final item in items) {
+      final ref = (item.producto.referenciaInterna ?? '').isNotEmpty
+          ? '[${item.producto.referenciaInterna}] '
+          : '';
+      buffer.writeln(
+        '- $ref${item.producto.nombre} x${item.cantidad} = S/ ${item.subtotal.toStringAsFixed(2)}',
+      );
+    }
+    buffer
+      ..writeln()
+      ..writeln('Total: S/ ${total.toStringAsFixed(2)}');
+    return buffer.toString();
   }
 
   @override

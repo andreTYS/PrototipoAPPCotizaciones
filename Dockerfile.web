@@ -1,0 +1,15 @@
+# Build web/PWA servida como sitio estático — el mismo patrón de despliegue
+# (Docker + Traefik) que ya usan el ERP (ICR-LOGISTICA) y la tienda pública
+# (ICR-TIENDA) en el VPS de Inversiones ICR.
+FROM ghcr.io/cirruslabs/flutter:3.35.5 AS build
+WORKDIR /app
+COPY . .
+RUN flutter pub get
+# --no-web-resources-cdn: la build sirve su propio CanvasKit en vez de
+# depender de Google en cada carga — importante para uso en campo con
+# conexión limitada. Ver README.md "Build web / PWA".
+RUN flutter build web --release --no-web-resources-cdn
+
+FROM nginx:alpine
+COPY --from=build /app/build/web /usr/share/nginx/html
+EXPOSE 80

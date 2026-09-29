@@ -211,7 +211,7 @@ class PdfService {
             children: [
               pw.Text(
                 'RUC: $_ruc',
-                style: const pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 2),
               pw.Text(
@@ -262,7 +262,7 @@ class PdfService {
                 children: [
                   pw.Text(
                     cliente.isEmpty ? 'Cliente sin nombre' : cliente,
-                    style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
                   ),
                   if (rucDni.isNotEmpty) ...[
                     pw.SizedBox(height: 2),
@@ -295,7 +295,7 @@ class PdfService {
                   ),
                   pw.Text(
                     fecha,
-                    style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
                   ),
                 ],
               ),
@@ -320,7 +320,7 @@ class PdfService {
                       ),
                       pw.Text(
                         vendedor.isEmpty ? '-' : vendedor,
-                        style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
                       ),
                     ],
                   ),
@@ -336,7 +336,7 @@ class PdfService {
                       ),
                       pw.Text(
                         _email,
-                        style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
                       ),
                     ],
                   ),
@@ -361,7 +361,7 @@ class PdfService {
       flex: flex,
       child: pw.Text(
         texto,
-        style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
       ),
     );
   }
