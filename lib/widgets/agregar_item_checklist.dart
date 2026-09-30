@@ -51,7 +51,7 @@ class _HojaAgregarItemState extends State<_HojaAgregarItem> {
     super.dispose();
   }
 
-  Future<void> _agregar(String texto, {bool esProducto = false}) async {
+  Future<void> _agregar(String texto, {bool esProducto = false, String? sku}) async {
     final limpio = texto.trim();
     if (limpio.isEmpty || _guardando) return;
     setState(() => _guardando = true);
@@ -77,7 +77,7 @@ class _HojaAgregarItemState extends State<_HojaAgregarItem> {
       }
     }
 
-    widget.checklist.agregarItemEn(widget.categoriaIndex, limpio, esProducto: esProducto);
+    widget.checklist.agregarItemEn(widget.categoriaIndex, limpio, esProducto: esProducto, sku: sku);
     if (mounted) Navigator.pop(context);
   }
 
@@ -88,7 +88,13 @@ class _HojaAgregarItemState extends State<_HojaAgregarItem> {
       backgroundColor: Colors.transparent,
       builder: (_) => const BuscadorProductos(titulo: 'Buscar en el catálogo'),
     );
-    if (producto != null) await _agregar(producto.nombre, esProducto: true);
+    if (producto != null) {
+      // referenciaInterna es el SKU real del ERP solo si el producto vino
+      // sincronizado de ahí — para uno agregado a mano queda null, y el
+      // ítem se comporta como cualquier otro de texto libre (sin reservar
+      // stock real). Ver ChecklistItemEntry.sku.
+      await _agregar(producto.nombre, esProducto: true, sku: producto.referenciaInterna);
+    }
   }
 
   @override

@@ -98,7 +98,125 @@ class ApiService {
     required String notas,
     String? telefono,
   }) async {
-    final uri = Uri.parse('$baseUrl/crm/leads');
+    await _postJson(
+      baseUrl: baseUrl,
+      token: token,
+      ruta: '/crm/leads',
+      body: {
+        'channel': 'api',
+        'nombre_contacto': cliente.isEmpty ? 'Cliente de cotización de campo' : cliente,
+        'dni': rucDni.isEmpty ? null : rucDni,
+        'telefono': (telefono == null || telefono.isEmpty) ? null : telefono,
+        'origen': 'OTRO',
+        'notas': notas,
+      },
+    );
+  }
+
+  // -------------------- Almacén: reservas y préstamos --------------------
+  //
+  // Conecta Requerimientos/Checklist de herramientas al inventario real del
+  // ERP, solo para los ítems que se agregaron "Del catálogo" (con SKU real
+  // — ver ChecklistItemEntry.sku). Mismo criterio best-effort que el resto
+  // de esta clase: AlmacenState decide qué hacer si alguna llamada falla,
+  // nunca se bloquea el registro local por un problema de red.
+
+  /// Almacenes reales del ERP, para elegir contra cuál se reserva/despacha
+  /// (se pide una vez en Conexión con el ERP, ver ErpConfigService).
+  static Future<List<Map<String, dynamic>>> listarAlmacenes(String baseUrl, String token) async {
+    final uri = Uri.parse('$baseUrl/inventory/warehouses');
+    final res = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(const Duration(seconds: 20));
+    if (res.statusCode != 200) {
+      throw Exception('El ERP respondió ${res.statusCode} en /inventory/warehouses');
+    }
+    final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Aparta stock real para un ítem (al aprobar un requerimiento, o al
+  /// registrar la salida de una herramienta) — devuelve el id de la reserva.
+  static Future<int> reservarStock({
+    required String baseUrl,
+    required String token,
+    required String sku,
+    required int cantidad,
+    required String warehouseCode,
+  }) async {
+    final data = await _postJson(
+      baseUrl: baseUrl,
+      token: token,
+      ruta: '/inventory/reserve',
+      body: {
+        'product': {'sku': sku},
+        'quantity': cantidad,
+        'warehouse_code': warehouseCode,
+        'channel': 'api',
+      },
+    );
+    return (data['reserva_id'] as num).toInt();
+  }
+
+  /// Libera una reserva sin despacharla — se usa al eliminar un
+  /// requerimiento ya aprobado (con stock apartado) antes de entregarse.
+  static Future<void> liberarReserva({
+    required String baseUrl,
+    required String token,
+    required int reservaId,
+  }) async {
+    await _postJson(
+      baseUrl: baseUrl,
+      token: token,
+      ruta: '/inventory/release_reservation',
+      body: {'reserva_id': reservaId, 'channel': 'api'},
+    );
+  }
+
+  /// Convierte la reserva en salida real (descuenta stock físico). Si el
+  /// producto es retornable, el ERP crea también el préstamo y devuelve su
+  /// id; si no, devuelve null (quedó como consumo normal).
+  static Future<int?> despacharReserva({
+    required String baseUrl,
+    required String token,
+    required int reservaId,
+    required int cantidad,
+  }) async {
+    final data = await _postJson(
+      baseUrl: baseUrl,
+      token: token,
+      ruta: '/inventory/dispatch_reservation',
+      body: {'reserva_id': reservaId, 'cantidad': cantidad, 'channel': 'api'},
+    );
+    return (data['prestamo_id'] as num?)?.toInt();
+  }
+
+  /// Cierra un préstamo de herramienta y repone el stock físico — al
+  /// confirmar la devolución en el checklist de herramientas.
+  static Future<void> devolverPrestamo({
+    required String baseUrl,
+    required String token,
+    required int prestamoId,
+  }) async {
+    await _postJson(
+      baseUrl: baseUrl,
+      token: token,
+      ruta: '/inventory/return_loan',
+      body: {'prestamo_id': prestamoId, 'channel': 'api'},
+    );
+  }
+
+  /// POST genérico contra el ERP: arma el body, valida el sobre estándar
+  /// `{status, data, error}` y devuelve `data`, o tira una excepción con el
+  /// mensaje real del ERP si algo salió mal.
+  static Future<Map<String, dynamic>> _postJson({
+    required String baseUrl,
+    required String token,
+    required String ruta,
+    required Map<String, dynamic> body,
+  }) async {
+    final uri = Uri.parse('$baseUrl$ruta');
     final res = await http
         .post(
           uri,
@@ -106,21 +224,15 @@ class ApiService {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
           },
-          body: jsonEncode({
-            'channel': 'api',
-            'nombre_contacto': cliente.isEmpty ? 'Cliente de cotización de campo' : cliente,
-            'dni': rucDni.isEmpty ? null : rucDni,
-            'telefono': (telefono == null || telefono.isEmpty) ? null : telefono,
-            'origen': 'OTRO',
-            'notas': notas,
-          }),
+          body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 20));
 
-    final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>?;
-    if (res.statusCode < 200 || res.statusCode >= 300 || body?['status'] != 'success') {
-      final mensaje = (body?['error'] as Map<String, dynamic>?)?['message'] as String?;
-      throw Exception(mensaje ?? 'El ERP respondió ${res.statusCode}');
+    final parsed = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>?;
+    if (res.statusCode < 200 || res.statusCode >= 300 || parsed?['status'] != 'success') {
+      final mensaje = (parsed?['error'] as Map<String, dynamic>?)?['message'] as String?;
+      throw Exception(mensaje ?? 'El ERP respondió ${res.statusCode} en $ruta');
     }
+    return Map<String, dynamic>.from(parsed?['data'] as Map? ?? {});
   }
 }

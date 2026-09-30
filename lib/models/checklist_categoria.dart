@@ -63,12 +63,33 @@ class ChecklistItemEntry {
   /// la traen, así que es opcional y se muestra solo si existe.
   final String? unidad;
 
+  /// SKU real del ERP, solo cuando el ítem se agregó desde "Del catálogo"
+  /// (BuscadorProductos) y el producto vino sincronizado del ERP — nunca
+  /// para los ítems del Excel semilla ni los escritos a mano, que siguen
+  /// siendo texto libre sin contraparte real en el inventario. Es lo que
+  /// permite reservar/despachar/devolver stock de verdad en AlmacenState.
+  final String? sku;
+
+  /// Id de la reserva de stock en el ERP mientras está ACTIVA (entre que el
+  /// jefe de obra aprueba un requerimiento y almacén confirma la entrega, o
+  /// durante el reserve+dispatch de una salida de herramientas). Se limpia
+  /// a null en cuanto se despacha — de ahí en más [prestamoId] es lo que
+  /// queda pendiente.
+  int? reservaId;
+
+  /// Id del préstamo de herramienta en el ERP, mientras sigue prestada. Se
+  /// limpia a null en cuanto se confirma la devolución.
+  int? prestamoId;
+
   ChecklistItemEntry({
     required this.texto,
     this.cantidad = 0,
     this.esExtra = false,
     this.esProducto = false,
     this.unidad,
+    this.sku,
+    this.reservaId,
+    this.prestamoId,
   });
 
   bool get marcado => cantidad > 0;
@@ -90,6 +111,9 @@ class ChecklistItemEntry {
       esExtra: json['es_extra'] == true,
       esProducto: json['es_producto'] == true,
       unidad: json['unidad'] as String?,
+      sku: json['sku'] as String?,
+      reservaId: (json['reserva_id'] as num?)?.toInt(),
+      prestamoId: (json['prestamo_id'] as num?)?.toInt(),
     );
   }
 
@@ -99,6 +123,9 @@ class ChecklistItemEntry {
         'es_extra': esExtra,
         'es_producto': esProducto,
         if (unidad != null) 'unidad': unidad,
+        if (sku != null) 'sku': sku,
+        if (reservaId != null) 'reserva_id': reservaId,
+        if (prestamoId != null) 'prestamo_id': prestamoId,
       };
 }
 

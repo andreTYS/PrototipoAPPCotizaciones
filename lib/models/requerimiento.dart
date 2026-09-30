@@ -63,6 +63,9 @@ class Requerimiento {
     String? aprobadoPor,
     DateTime? fechaEntrega,
     String? recibidoPor,
+    // Solo lo usa AlmacenState, para guardar de vuelta el reserva_id/
+    // prestamo_id de cada ítem después de sincronizar con el ERP.
+    String? categoriasJson,
   }) {
     return Requerimiento(
       id: id ?? this.id,
@@ -77,7 +80,7 @@ class Requerimiento {
       fechaEntrega: fechaEntrega ?? this.fechaEntrega,
       recibidoPor: recibidoPor ?? this.recibidoPor,
       observaciones: observaciones,
-      categoriasJson: categoriasJson,
+      categoriasJson: categoriasJson ?? this.categoriasJson,
     );
   }
 

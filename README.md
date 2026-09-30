@@ -32,6 +32,22 @@ navegador — mismo código, misma base de datos local en ambos casos.
   RUC/DNI y el detalle de productos — best-effort: si falla (sin señal,
   token vencido), el PDF ya se generó y compartió igual, no se pierde
   nada.
+- **Almacén (Requerimientos y Checklist de herramientas):** los ítems del
+  checklist son texto libre del Excel semilla, salvo los que se agregan
+  "Del catálogo" (buscador de productos) — esos sí traen el SKU real del
+  ERP. Solo esos ítems tocan inventario de verdad, usando el sistema de
+  reservas/préstamos que ya tiene el ERP (`/inventory/reserve`,
+  `/inventory/dispatch_reservation`, `/inventory/return_loan`):
+  - Un requerimiento **aprueba** → reserva stock; **entrega** → lo despacha
+    (descuenta stock físico real; si el producto es retornable, el ERP
+    crea el préstamo).
+  - Una salida de herramientas reserva y despacha de una sola vez; su
+    **devolución** cierra el préstamo.
+  - Igual que el resto de esta app, es **best-effort**: si el ERP no está
+    configurado o la llamada falla, el requerimiento/checklist se sigue
+    guardando local sin bloquear al usuario — ver `AlmacenState`.
+  - El almacén contra el que se reserva se elige una vez en *Conexión con
+    el ERP* (desplegable con los almacenes activos del ERP).
 - El único archivo que habla con el ERP es `lib/services/api_service.dart`
   — el resto de la app (pantallas, PDF, checklist, base local) no sabe de
   dónde vino el catálogo.

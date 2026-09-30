@@ -154,12 +154,17 @@ class ChecklistState extends ChangeNotifier {
 
   /// Agrega un ítem nuevo (ya marcado) a una categoría cualquiera, solo para
   /// este checklist.
-  void agregarItemEn(int categoriaIndex, String texto, {bool esProducto = false}) {
+  void agregarItemEn(int categoriaIndex, String texto, {bool esProducto = false, String? sku}) {
     final limpio = texto.trim();
     if (limpio.isEmpty) return;
     _categorias[categoriaIndex].items.add(
           ChecklistItemEntry(
-              texto: capitalizarPrimeraLetra(limpio), cantidad: 1, esExtra: true, esProducto: esProducto),
+            texto: capitalizarPrimeraLetra(limpio),
+            cantidad: 1,
+            esExtra: true,
+            esProducto: esProducto,
+            sku: sku,
+          ),
         );
     notifyListeners();
   }

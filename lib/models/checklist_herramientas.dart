@@ -52,6 +52,9 @@ class ChecklistHerramientas {
     DateTime? fechaDevolucion,
     String? encargado,
     String? observacionesDevolucion,
+    // Solo lo usa AlmacenState, para guardar de vuelta el reserva_id/
+    // prestamo_id de cada ítem después de sincronizar con el ERP.
+    String? categoriasJson,
   }) {
     return ChecklistHerramientas(
       id: id ?? this.id,
@@ -64,7 +67,7 @@ class ChecklistHerramientas {
       encargado: encargado ?? this.encargado,
       observaciones: observaciones,
       observacionesDevolucion: observacionesDevolucion ?? this.observacionesDevolucion,
-      categoriasJson: categoriasJson,
+      categoriasJson: categoriasJson ?? this.categoriasJson,
     );
   }
 
