@@ -1,7 +1,11 @@
 # Build web/PWA servida como sitio estático — el mismo patrón de despliegue
 # (Docker + Traefik) que ya usan el ERP (ICR-LOGISTICA) y la tienda pública
 # (ICR-TIENDA) en el VPS de Inversiones ICR.
-FROM ghcr.io/cirruslabs/flutter:3.35.5 AS build
+# stable (no versión fija): image_picker (nuevo en el catálogo) exige un SDK
+# de Dart más reciente que el que traía la versión de Flutter fijada antes
+# (3.35.5 -> Dart 3.9.2, insuficiente); en vez de perseguir el número exacto
+# cada vez que suba una dependencia, se sigue el canal estable.
+FROM ghcr.io/cirruslabs/flutter:stable AS build
 WORKDIR /app
 COPY . .
 RUN flutter pub get
