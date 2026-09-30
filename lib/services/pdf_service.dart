@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -115,9 +117,22 @@ class PdfService {
     return doc.save();
   }
 
-  /// Guarda el PDF ya generado en el almacenamiento propio de la app, para
-  /// poder volver a abrirlo/compartirlo después desde el Historial.
+  // Prefijo que marca que "la ruta" guardada en el historial no es un path
+  // de archivo sino el PDF entero embebido en base64 — así se distingue de
+  // un path real sin tener que tocar el esquema de la tabla
+  // cotizaciones_guardadas (columna archivo_pdf, ya en uso en el celular).
+  static const _prefijoB64 = 'b64:';
+
+  /// Guarda el PDF ya generado para poder volver a abrirlo/compartirlo
+  /// después desde el Historial. En Android/iOS queda en un archivo real
+  /// (como siempre); en la build web/PWA no existe tal cosa como una
+  /// carpeta propia de la app (path_provider no tiene con qué implementar
+  /// getApplicationDocumentsDirectory ahí), así que el PDF se guarda
+  /// embebido en el propio registro del historial.
   static Future<String> guardarEnDisco(Uint8List bytes, int numero) async {
+    if (kIsWeb) {
+      return '$_prefijoB64${base64Encode(bytes)}';
+    }
     final dir = await getApplicationDocumentsDirectory();
     final carpeta = Directory('${dir.path}/cotizaciones');
     if (!await carpeta.exists()) {
@@ -126,6 +141,34 @@ class PdfService {
     final archivo = File('${carpeta.path}/cotizacion_${formatearNumero(numero)}.pdf');
     await archivo.writeAsBytes(bytes);
     return archivo.path;
+  }
+
+  /// Lee de vuelta un PDF guardado con [guardarEnDisco], sin que el
+  /// llamador necesite saber si es un path real o el contenido embebido.
+  static Future<Uint8List> leerArchivo(String ruta) async {
+    if (ruta.startsWith(_prefijoB64)) {
+      return base64Decode(ruta.substring(_prefijoB64.length));
+    }
+    return File(ruta).readAsBytes();
+  }
+
+  /// El contenido embebido siempre "existe" (va dentro del propio registro);
+  /// solo un path real puede haberse perdido (celular restaurado, etc.).
+  static Future<bool> existeArchivo(String ruta) async {
+    if (ruta.startsWith(_prefijoB64)) return true;
+    return File(ruta).exists();
+  }
+
+  /// Nada que borrar del disco cuando el PDF está embebido — desaparece
+  /// solo con el registro del historial.
+  static Future<void> eliminarArchivo(String ruta) async {
+    if (ruta.startsWith(_prefijoB64)) return;
+    try {
+      final archivo = File(ruta);
+      if (await archivo.exists()) await archivo.delete();
+    } catch (_) {
+      // No pasa nada si el archivo ya no está o no se puede borrar.
+    }
   }
 
   /// PDF formal de un requerimiento de materiales: el mismo encabezado de

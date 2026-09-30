@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import '../models/cotizacion_guardada.dart';
 import '../services/db_helper.dart';
+import '../services/pdf_service.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
 import '../utils/formato.dart';
@@ -212,7 +212,7 @@ class _HistorialCotizacionesScreenState extends State<HistorialCotizacionesScree
 }
 
 Future<bool> _verificarArchivo(BuildContext context, String ruta) async {
-  final existe = await File(ruta).exists();
+  final existe = await PdfService.existeArchivo(ruta);
   if (!existe && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Ese PDF ya no está disponible en el celular.')),
@@ -223,7 +223,7 @@ Future<bool> _verificarArchivo(BuildContext context, String ruta) async {
 
 Future<void> compartirCotizacion(BuildContext context, CotizacionGuardada c) async {
   if (!await _verificarArchivo(context, c.archivoPdf)) return;
-  final bytes = await File(c.archivoPdf).readAsBytes();
+  final bytes = await PdfService.leerArchivo(c.archivoPdf);
   await Printing.sharePdf(bytes: bytes, filename: 'cotizacion_${c.numero}.pdf');
 }
 
@@ -250,12 +250,7 @@ Future<bool> eliminarCotizacion(BuildContext context, CotizacionGuardada c) asyn
   );
   if (confirmar != true) return false;
   await DbHelper.instance.eliminarCotizacion(c.id!);
-  try {
-    final archivo = File(c.archivoPdf);
-    if (await archivo.exists()) await archivo.delete();
-  } catch (_) {
-    // No pasa nada si el archivo ya no está o no se puede borrar.
-  }
+  await PdfService.eliminarArchivo(c.archivoPdf);
   return true;
 }
 
@@ -388,7 +383,7 @@ class CotizacionDetalleScreen extends StatelessWidget {
         builder: (_) => VistaPreviaPdfScreen(
           titulo: 'Cotización ${cotizacion.numero}',
           nombreArchivo: 'cotizacion_${cotizacion.numero}.pdf',
-          generar: () => File(cotizacion.archivoPdf).readAsBytes(),
+          generar: () => PdfService.leerArchivo(cotizacion.archivoPdf),
         ),
       ),
     );
