@@ -3,8 +3,16 @@
          también en builds release; Flutter solo la agrega por defecto en
          debug/profile para las herramientas de desarrollo. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Para reconocer el pedido dictado por voz en la pestaña "Voz". -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Aviso en el celular cuando se crea un requerimiento pendiente de
+         aprobación (Android 13+ además lo pide en tiempo de ejecución). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <application
-        android:label="cotizador_icr"
+        android:label="ICR Energy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
@@ -45,6 +53,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Necesario en Android 11+ para que speech_to_text encuentre el
+             reconocedor de voz del sistema (ver package visibility). -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 </manifest>

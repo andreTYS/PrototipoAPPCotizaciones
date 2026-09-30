@@ -129,13 +129,34 @@ No es necesario para conectar con `https://erp.inversionesicr.com`.
 
 ## 6. Usarla
 
-1. Abre la app — ya vas a ver las categorías con los productos, sin tocar
-   nada (catálogo offline empaquetado, o el último sincronizado con el
-   ERP).
-2. Entra a una categoría, marca los productos del checklist y ajusta
-   cantidades con los botones + / -.
-3. Toca el botón flotante "Cotización" para revisar lo seleccionado, pon
-   el nombre del cliente si quieres, y dale a **Generar y compartir
-   PDF** — se abre el menú nativo para compartir por WhatsApp, correo,
-   guardar, etc. Si el ERP está configurado, también queda como Lead en
-   el CRM.
+La app tiene tres pestañas abajo:
+
+- **Cotización** (izquierda): los productos del catálogo (offline
+  empaquetado, o el último sincronizado con el ERP real — ver sección 3),
+  "Todos" o por categoría. Marca productos, ajusta cantidades y toca
+  **Generar cotización** para armar el PDF con el formato de Inversiones
+  ICR y completar los datos del cliente/RUC-DNI/teléfono; si el ERP está
+  configurado, la cotización también se intenta enviar como Lead al CRM
+  (best-effort, sin bloquear el PDF si falla). Arriba están la
+  **cotización por voz** (micrófono), el **historial de cotizaciones**
+  (reloj: buscar, ver detalle, compartir o eliminar) y **agregar
+  producto** (+, con foto, precio, costo, unidad y referencia). Los
+  productos agregados a mano se pueden editar o eliminar (⋮).
+- **Inicio** (centro): lo que requiere atención — requerimientos urgentes o
+  pendientes de aprobación, aprobados que falta entregar y herramientas por
+  devolver — más accesos directos a Almacén y Cotización.
+- **Almacén** (derecha):
+  - **Requerimientos**: se crean con el checklist de siempre (categoría por
+    categoría). Estados: *Pendiente aprobación* (llega una notificación al
+    celular) → *Aprobado por jefe de obra* (pide el código **1234**) →
+    *Entregado*. Cada uno tiene su PDF formal para ver o compartir.
+  - **Checklist de herramientas**: se registra la salida (queda *Pendiente
+    devolución*) y, cuando un encargado confirma que volvió todo, queda
+    *Conforme*. También con su PDF.
+  - Con el ícono de lista (arriba) se agregan ítems nuevos a la lista base
+    de materiales o de herramientas.
+
+Para traer el catálogo actualizado y sincronizar cotizaciones con el ERP
+real de Inversiones ICR, ver la sección **3. Conectar con el ERP real**
+más arriba (URL del ERP + token de servicio, sin IPs locales de por
+medio).

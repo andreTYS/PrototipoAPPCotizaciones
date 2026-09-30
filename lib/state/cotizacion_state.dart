@@ -38,6 +38,24 @@ class CotizacionState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A diferencia de [toggle], nunca quita: si ya estaba en la cotización le
+  /// suma una unidad más. Lo usa el buscador de "Agregar producto" desde la
+  /// pantalla de Cotización.
+  void agregarUno(Producto p) {
+    final key = _key(p);
+    if (_items.containsKey(key)) {
+      _items[key]!.cantidad += 1;
+    } else {
+      _items[key] = ItemCotizacion(producto: p);
+    }
+    notifyListeners();
+  }
+
+  void quitar(Producto p) {
+    _items.remove(_key(p));
+    notifyListeners();
+  }
+
   void setCantidad(Producto p, int cantidad) {
     final key = _key(p);
     if (cantidad <= 0) {

@@ -6,15 +6,25 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/checklist_categoria.dart';
+import '../models/checklist_herramientas.dart';
+import '../models/producto.dart';
+import '../models/requerimiento.dart';
 import '../state/cotizacion_state.dart';
 import '../theme/brand_colors.dart';
+import '../utils/checklist_estilo.dart';
+
+const _firmaAsset = 'assets/fonts/DancingScript-Bold.ttf';
 
 const _logoAsset = 'assets/icon/icon.png';
 
-/// Genera la cotización en PDF con el formato oficial de Inversiones ICR:
+/// Genera los PDFs con el formato oficial de Inversiones ICR. La cotización:
 /// encabezado con logo/RUC/Nro, fila de cliente (+ RUC/DNI opcional) /
 /// total/fecha, vendedor/email, tabla de productos, y el bloque de
-/// Banco/Moneda/Cuenta/CCI + Subtotal/Impuestos/Total al final.
+/// Banco/Moneda/Cuenta/CCI + Subtotal/Impuestos/Total al final. Los
+/// documentos de almacén (requerimiento, checklist de herramientas) usan el
+/// mismo encabezado de marca, las secciones por categoría del checklist y
+/// firmas al pie.
 class PdfService {
   static const _empresa = 'INVERSIONES ICR S.R.L.';
   static const _direccion = 'Calle Pizarro 325 C, Arequipa';
@@ -42,6 +52,7 @@ class PdfService {
     required List<ItemCotizacion> items,
     String cliente = '',
     String rucDni = '',
+    String telefono = '',
     String vendedor = '',
     String banco = '',
     String moneda = '',
@@ -71,6 +82,7 @@ class PdfService {
           logo: logo,
           cliente: cliente,
           rucDni: rucDni,
+          telefono: telefono,
           vendedor: vendedor,
           fecha: fecha,
           numero: numero,
@@ -79,12 +91,12 @@ class PdfService {
         ),
         build: (context) => [
           ...items.asMap().entries.map(
-            (e) => _filaProducto(
-              index: e.key,
-              item: e.value,
-              imagen: imagenes[e.value.producto.archivoImagen],
-            ),
-          ),
+                (e) => _filaProducto(
+                  index: e.key,
+                  item: e.value,
+                  imagen: imagenes[e.value.producto.archivoImagen],
+                ),
+              ),
           pw.SizedBox(height: 16),
           _bancoYTotales(
             banco: banco,
@@ -116,28 +128,501 @@ class PdfService {
     return archivo.path;
   }
 
+  /// PDF formal de un requerimiento de materiales: el mismo encabezado de
+  /// marca que la cotización (con su recuadro de RUC / tipo de documento /
+  /// Nro), los datos del pedido, una sección por categoría con lo pedido
+  /// —el casillero se marca recién cuando se entregó— y las firmas de quien
+  /// pide, quien aprueba (jefe de obra) y quien recibe.
+  static Future<Uint8List> generarRequerimiento(Requerimiento r) async {
+    final logo = await _cargarLogo();
+    final firmaFont = await _cargarFuenteFirma();
+    final fecha = DateFormat('dd/MM/yyyy HH:mm');
+
+    final doc = pw.Document();
+    doc.addPage(
+      pw.MultiPage(
+        margin: const pw.EdgeInsets.all(24),
+        header: (context) => _encabezadoDocumento(
+          context: context,
+          logo: logo,
+          tipoDocumento: 'REQUERIMIENTO',
+          numero: r.numero,
+          datos: [
+            ('Obra / proyecto', r.obra),
+            ('Fecha de solicitud', fecha.format(r.fechaCreacion)),
+            ('Solicitante', r.solicitante),
+            ('Estado', r.estado.etiqueta),
+          ],
+          destacado: r.urgente ? 'PRIORIDAD: URGENTE' : null,
+        ),
+        build: (context) => [
+          _resumenCantidades('Materiales solicitados', r.totalItems, r.totalUnidades),
+          _leyendaCasillas(marcada: 'Entregado', vacia: 'Pendiente de entrega'),
+          for (final cat in r.categorias) ..._seccionCategoriaDocumento(cat, marcado: r.entregado),
+          ..._bloqueObservaciones('Observaciones', r.observaciones),
+          pw.SizedBox(height: 30),
+          _firmas(
+            [
+              _Firma(
+                nombre: r.solicitante,
+                cargo: 'Solicitante',
+                detalle: fecha.format(r.fechaCreacion),
+                completada: true,
+              ),
+              _Firma(
+                nombre: r.aprobadoPor,
+                cargo: 'Aprobado por jefe de obra',
+                detalle: r.fechaAprobacion == null ? 'Pendiente de aprobación' : fecha.format(r.fechaAprobacion!),
+                completada: r.fechaAprobacion != null,
+                textoSinNombre: 'Aprobado',
+              ),
+              _Firma(
+                nombre: r.recibidoPor,
+                cargo: 'Recibido por',
+                detalle: r.fechaEntrega == null ? 'Pendiente de entrega' : fecha.format(r.fechaEntrega!),
+                completada: r.fechaEntrega != null,
+                textoSinNombre: 'Entregado',
+              ),
+            ],
+            firmaFont,
+          ),
+        ],
+      ),
+    );
+    return doc.save();
+  }
+
+  /// PDF formal de un checklist de herramientas: mismo formato que el
+  /// requerimiento; el casillero de cada herramienta se marca cuando el
+  /// encargado confirmó que volvió (estado Conforme).
+  static Future<Uint8List> generarChecklistHerramientas(ChecklistHerramientas h) async {
+    final logo = await _cargarLogo();
+    final firmaFont = await _cargarFuenteFirma();
+    final fecha = DateFormat('dd/MM/yyyy HH:mm');
+
+    final doc = pw.Document();
+    doc.addPage(
+      pw.MultiPage(
+        margin: const pw.EdgeInsets.all(24),
+        header: (context) => _encabezadoDocumento(
+          context: context,
+          logo: logo,
+          tipoDocumento: 'CHECKLIST DE HERRAMIENTAS',
+          numero: h.numero,
+          datos: [
+            ('Obra / proyecto', h.obra),
+            ('Fecha de salida', fecha.format(h.fechaSalida)),
+            ('Responsable', h.responsable),
+            ('Estado', h.estado.etiqueta),
+          ],
+        ),
+        build: (context) => [
+          _resumenCantidades('Herramientas registradas', h.totalItems, h.totalUnidades),
+          _leyendaCasillas(marcada: 'Devuelta', vacia: 'Pendiente de devolución'),
+          for (final cat in h.categorias) ..._seccionCategoriaDocumento(cat, marcado: h.conforme),
+          ..._bloqueObservaciones('Observaciones de la salida', h.observaciones),
+          ..._bloqueObservaciones('Observaciones de la devolución', h.observacionesDevolucion),
+          pw.SizedBox(height: 30),
+          _firmas(
+            [
+              _Firma(
+                nombre: h.responsable,
+                cargo: 'Responsable (retira)',
+                detalle: fecha.format(h.fechaSalida),
+                completada: true,
+              ),
+              _Firma(
+                nombre: h.encargado,
+                cargo: 'Encargado (recibe la devolución)',
+                detalle: h.fechaDevolucion == null ? 'Pendiente de devolución' : fecha.format(h.fechaDevolucion!),
+                completada: h.fechaDevolucion != null,
+                textoSinNombre: 'Conforme',
+              ),
+            ],
+            firmaFont,
+          ),
+        ],
+      ),
+    );
+    return doc.save();
+  }
+
+  static Future<pw.MemoryImage> _cargarLogo() async =>
+      pw.MemoryImage((await rootBundle.load(_logoAsset)).buffer.asUint8List());
+
+  /// La firma se escribe en la tipografía cursiva, simulando una firma; si
+  /// no se pudiera cargar, sale con la tipografía normal.
+  static Future<pw.Font?> _cargarFuenteFirma() async {
+    try {
+      return pw.Font.ttf(await rootBundle.load(_firmaAsset));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fila de marca de la empresa (logo + razón social + dirección), igual en
+  /// todos los documentos, más el recuadro de la derecha con el RUC y el
+  /// tipo/número del documento.
+  static pw.Widget _tarjetaEmpresa(pw.MemoryImage logo, String tipoDocumento, String numero) {
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Expanded(
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Image(logo, height: 34, fit: pw.BoxFit.contain),
+              pw.SizedBox(width: 10),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      _empresa,
+                      style: pw.TextStyle(
+                        fontSize: 15,
+                        fontWeight: pw.FontWeight.bold,
+                        color: BrandColors.pdfAzulMarino,
+                      ),
+                    ),
+                    pw.SizedBox(height: 3),
+                    pw.Text(
+                      _direccion,
+                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.grey400),
+            borderRadius: pw.BorderRadius.circular(4),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Text(
+                'RUC: $_ruc',
+                style: const pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                tipoDocumento,
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                  color: BrandColors.pdfCian,
+                ),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                'Nro $numero',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Encabezado de requerimientos y checklists de herramientas: en la
+  /// primera página, la tarjeta de la empresa más el recuadro con los datos
+  /// del documento (y el aviso de urgente si corresponde); en las demás,
+  /// solo la tarjeta, igual que en la cotización.
+  static pw.Widget _encabezadoDocumento({
+    required pw.Context context,
+    required pw.MemoryImage logo,
+    required String tipoDocumento,
+    required String numero,
+    required List<(String, String)> datos,
+    String? destacado,
+  }) {
+    final tarjeta = _tarjetaEmpresa(logo, tipoDocumento, numero);
+    if (context.pageNumber != 1) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [tarjeta, pw.SizedBox(height: 10)],
+      );
+    }
+
+    pw.Widget par((String, String) dato) {
+      final (etiqueta, valor) = dato;
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(etiqueta, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+          pw.Text(
+            valor.trim().isEmpty ? '-' : valor.trim(),
+            style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+          ),
+        ],
+      );
+    }
+
+    final filas = <pw.Widget>[];
+    for (var i = 0; i < datos.length; i += 2) {
+      if (filas.isNotEmpty) filas.add(pw.SizedBox(height: 8));
+      filas.add(
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(child: par(datos[i])),
+            pw.SizedBox(width: 12),
+            pw.Expanded(child: i + 1 < datos.length ? par(datos[i + 1]) : pw.SizedBox()),
+          ],
+        ),
+      );
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        tarjeta,
+        pw.SizedBox(height: 14),
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.grey300),
+            borderRadius: pw.BorderRadius.circular(4),
+          ),
+          child: pw.Column(children: filas),
+        ),
+        if (destacado != null) ...[
+          pw.SizedBox(height: 8),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.red50,
+              border: pw.Border.all(color: PdfColors.red300),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Text(
+              destacado,
+              style: const pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.red800),
+            ),
+          ),
+        ],
+        pw.SizedBox(height: 10),
+      ],
+    );
+  }
+
+  static pw.Widget _resumenCantidades(String titulo, int items, int unidades) {
+    final textoItems = items == 1 ? '1 ítem' : '$items ítems';
+    final textoUnidades = unidades == 1 ? '1 unidad' : '$unidades unidades';
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 4),
+      child: pw.Text(
+        '$titulo: $textoItems · $textoUnidades',
+        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: BrandColors.pdfAzulMarino),
+      ),
+    );
+  }
+
+  static pw.Widget _leyendaCasillas({required String marcada, required String vacia}) {
+    pw.Widget muestra(bool marcado, String texto) => pw.Row(
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            _casilla(marcado, tamano: 9),
+            pw.SizedBox(width: 4),
+            pw.Text(texto, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+          ],
+        );
+    return pw.Row(
+      children: [muestra(true, marcada), pw.SizedBox(width: 14), muestra(false, vacia)],
+    );
+  }
+
+  static pw.Widget _casilla(bool marcado, {double tamano = 12}) {
+    return pw.Container(
+      width: tamano,
+      height: tamano,
+      alignment: pw.Alignment.center,
+      decoration: pw.BoxDecoration(
+        color: marcado ? BrandColors.pdfCian : PdfColors.white,
+        border: pw.Border.all(color: marcado ? BrandColors.pdfCian : PdfColors.grey400),
+        borderRadius: pw.BorderRadius.circular(3),
+      ),
+      child: marcado
+          ? pw.Text(
+              'X',
+              style: pw.TextStyle(
+                fontSize: tamano * 0.66,
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            )
+          : null,
+    );
+  }
+
+  /// Misma sección por categoría que tenía el checklist de obra: franja
+  /// cian con el nombre y filas alternadas con casillero, ítem y cantidad.
+  static List<pw.Widget> _seccionCategoriaDocumento(ChecklistCategoriaState cat, {required bool marcado}) {
+    final cantidad = cat.items.length == 1 ? '1 ítem' : '${cat.items.length} ítems';
+    return [
+      pw.Container(
+        margin: const pw.EdgeInsets.only(top: 12, bottom: 4),
+        color: BrandColors.pdfCian,
+        padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Expanded(
+              child: pw.Text(
+                quitarNumeroCategoria(cat.nombre),
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                ),
+              ),
+            ),
+            pw.Text(cantidad, style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+          ],
+        ),
+      ),
+      ...cat.items.asMap().entries.map((e) {
+        final item = e.value;
+        return pw.Container(
+          color: e.key.isEven ? PdfColors.white : BrandColors.pdfTint(BrandColors.pdfCian, 0.94),
+          padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+          child: pw.Row(
+            children: [
+              _casilla(marcado),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: pw.Text(
+                  item.esExtra ? '${item.texto} (agregado${item.esProducto ? ' · catálogo' : ''})' : item.texto,
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Text(
+                item.cantidadTexto,
+                style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: BrandColors.pdfCian),
+              ),
+            ],
+          ),
+        );
+      }),
+    ];
+  }
+
+  static List<pw.Widget> _bloqueObservaciones(String titulo, String? texto) {
+    final limpio = (texto ?? '').trim();
+    if (limpio.isEmpty) return const [];
+    return [
+      pw.SizedBox(height: 14),
+      pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: PdfColors.grey300),
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(titulo, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+            pw.SizedBox(height: 2),
+            pw.Text(limpio, style: const pw.TextStyle(fontSize: 9)),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  /// Fila de firmas al pie: cada una con el nombre en cursiva (o, si ese paso
+  /// ya se hizo sin anotar nombre, el texto del estado), la línea, el cargo y
+  /// la fecha — o en blanco con "Pendiente..." mientras no se haya hecho.
+  static pw.Widget _firmas(List<_Firma> firmas, pw.Font? firmaFont) {
+    pw.Widget firma(_Firma f) {
+      final nombre = (f.nombre ?? '').trim();
+      final pw.Widget trazo;
+      if (!f.completada) {
+        trazo = pw.SizedBox(height: 30);
+      } else if (nombre.isNotEmpty) {
+        trazo = pw.SizedBox(
+          height: 30,
+          child: pw.Align(
+            alignment: pw.Alignment.bottomLeft,
+            child: pw.Text(
+              nombre,
+              maxLines: 1,
+              style: pw.TextStyle(font: firmaFont, fontSize: 20, color: BrandColors.pdfAzulMarino),
+            ),
+          ),
+        );
+      } else {
+        trazo = pw.SizedBox(
+          height: 30,
+          child: pw.Align(
+            alignment: pw.Alignment.bottomLeft,
+            child: pw.Text(
+              f.textoSinNombre,
+              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: BrandColors.pdfCian),
+            ),
+          ),
+        );
+      }
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          trazo,
+          pw.Container(
+            height: 0.8,
+            color: PdfColors.grey400,
+            margin: const pw.EdgeInsets.only(top: 2, bottom: 4),
+          ),
+          pw.Text(f.cargo, style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            f.detalle,
+            style: pw.TextStyle(fontSize: 8, color: f.completada ? PdfColors.grey600 : PdfColors.orange800),
+          ),
+        ],
+      );
+    }
+
+    final hijos = <pw.Widget>[];
+    for (final f in firmas) {
+      if (hijos.isNotEmpty) hijos.add(pw.SizedBox(width: 18));
+      hijos.add(pw.Expanded(child: firma(f)));
+    }
+    return pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: hijos);
+  }
+
   /// Las fotos van empaquetadas en la propia app (assets/productos/), así
-  /// que esto no depende de red ni de servidor: si un producto puntual no
-  /// trae imagen, o el archivo no está en el bundle, esa celda simplemente
-  /// queda en blanco — no debe impedir que se genere el resto del PDF.
+  /// que esto no depende de red ni de servidor; las de productos agregados
+  /// desde el celular se leen de su archivo. Si un producto puntual no trae
+  /// imagen, o el archivo ya no está, esa celda simplemente queda en blanco
+  /// — no debe impedir que se genere el resto del PDF.
   static Future<Map<String, Uint8List>> _cargarImagenes(
     List<ItemCotizacion> items,
   ) async {
     final resultado = <String, Uint8List>{};
 
-    final archivos = items
-        .map((i) => i.producto.archivoImagen)
-        .whereType<String>()
-        .where((a) => a.isNotEmpty)
-        .toSet();
+    final archivos = items.map((i) => i.producto.archivoImagen).whereType<String>().where((a) => a.isNotEmpty).toSet();
 
     await Future.wait(
       archivos.map((archivo) async {
         try {
-          final data = await rootBundle.load('assets/productos/$archivo');
-          resultado[archivo] = data.buffer.asUint8List();
+          if (esRutaDeArchivo(archivo)) {
+            resultado[archivo] = await File(archivo).readAsBytes();
+          } else {
+            final data = await rootBundle.load('assets/productos/$archivo');
+            resultado[archivo] = data.buffer.asUint8List();
+          }
         } catch (_) {
-          // No está empaquetada esta foto en particular: se omite.
+          // No está disponible esta foto en particular: se omite.
         }
       }),
     );
@@ -145,20 +630,30 @@ class PdfService {
   }
 
   // Solo 5 columnas (sin Impuestos ni Price): con menos columnas cada una
-  // tiene más aire, y la imagen queda en un cuadro de tamaño fijo — así se
-  // ve pareja fila con fila, en vez de estirarse según la foto de cada una.
-  static const _flexItem = 1;
-  static const _flexImagen = 3;
-  static const _flexDescripcion = 8;
-  static const _flexCantidad = 2;
-  static const _flexPUnit = 2;
-  static const _anchoImagen = 40.0;
+  // tiene más aire. Cada columna (salvo Descripción) tiene un ANCHO FIJO en
+  // puntos, puesto directo en el Row sin Expanded — con Expanded, el propio
+  // paquete pdf le impone al hijo un ancho "tight" igual al de su fracción
+  // de flex e ignora el width que pida su SizedBox, así que el cuadro de la
+  // imagen terminaba siendo angosto o ancho según el flex, no 40x40 real;
+  // con fotos de distinto aspecto (retrato/paisaje) cada una se veía a una
+  // escala distinta y la tabla se notaba descuadrada. Con ancho fijo real
+  // el cuadro de imagen (y el resto de columnas) miden siempre lo mismo,
+  // fila tras fila; Descripción es la única columna flexible, para que
+  // absorba el espacio que sobra sin desarmar a las demás.
+  static const _anchoItem = 26.0;
+  static const _anchoImagen = 42.0;
+  static const _anchoCantidad = 46.0;
+  static const _anchoPUnit = 56.0;
+  static const _espacioColumna = 6.0;
+
+  static pw.Widget _espacio() => pw.SizedBox(width: _espacioColumna);
 
   static pw.Widget _encabezado({
     required pw.Context context,
     required pw.MemoryImage logo,
     required String cliente,
     required String rucDni,
+    required String telefono,
     required String vendedor,
     required String fecha,
     required int numero,
@@ -238,11 +733,15 @@ class PdfService {
       padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
       child: pw.Row(
         children: [
-          _celdaHeader('Item.', _flexItem),
-          _celdaHeader('Imagen', _flexImagen),
-          _celdaHeader('Descripción del Artículo', _flexDescripcion),
-          _celdaHeader('Cantidad', _flexCantidad),
-          _celdaHeader('P. Unit.', _flexPUnit),
+          _celdaHeaderCol('Item.', ancho: _anchoItem),
+          _espacio(),
+          _celdaHeaderCol('Imagen', ancho: _anchoImagen),
+          _espacio(),
+          _celdaHeaderCol('Descripción del Artículo'),
+          _espacio(),
+          _celdaHeaderCol('Cantidad', ancho: _anchoCantidad),
+          _espacio(),
+          _celdaHeaderCol('P. Unit.', ancho: _anchoPUnit),
         ],
       ),
     );
@@ -268,6 +767,13 @@ class PdfService {
                     pw.SizedBox(height: 2),
                     pw.Text(
                       'RUC/DNI: $rucDni',
+                      style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                    ),
+                  ],
+                  if (telefono.isNotEmpty) ...[
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      'Tel: $telefono',
                       style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
                     ),
                   ],
@@ -366,6 +872,20 @@ class PdfService {
     );
   }
 
+  // Igual que _celdaHeader, pero para la tabla de productos: ancho fijo por
+  // columna (mismos anchos que usa _filaProducto) en vez de flex, salvo
+  // Descripción, que no lleva [ancho] y queda como la única columna
+  // flexible — así el header queda pixel a pixel alineado con las filas.
+  static pw.Widget _celdaHeaderCol(String texto, {double? ancho}) {
+    final contenido = pw.Text(
+      texto,
+      maxLines: 1,
+      overflow: pw.TextOverflow.clip,
+      style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+    );
+    return ancho != null ? pw.SizedBox(width: ancho, child: contenido) : pw.Expanded(child: contenido);
+  }
+
   static pw.Widget _filaProducto({
     required int index,
     required ItemCotizacion item,
@@ -380,26 +900,28 @@ class PdfService {
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          pw.Expanded(
-            flex: _flexItem,
+          pw.SizedBox(
+            width: _anchoItem,
             child: pw.Text('${index + 1}', style: const pw.TextStyle(fontSize: 9)),
           ),
+          _espacio(),
+          pw.SizedBox(
+            width: _anchoImagen,
+            height: _anchoImagen,
+            child: imagen != null ? pw.Image(pw.MemoryImage(imagen), fit: pw.BoxFit.contain) : null,
+          ),
+          _espacio(),
           pw.Expanded(
-            flex: _flexImagen,
-            child: pw.SizedBox(
-              width: _anchoImagen,
-              height: _anchoImagen,
-              child: imagen != null
-                  ? pw.Image(pw.MemoryImage(imagen), fit: pw.BoxFit.contain)
-                  : null,
+            child: pw.Text(
+              '$ref${p.nombre}',
+              maxLines: 2,
+              overflow: pw.TextOverflow.clip,
+              style: const pw.TextStyle(fontSize: 9),
             ),
           ),
-          pw.Expanded(
-            flex: _flexDescripcion,
-            child: pw.Text('$ref${p.nombre}', style: const pw.TextStyle(fontSize: 9)),
-          ),
-          pw.Expanded(
-            flex: _flexCantidad,
+          _espacio(),
+          pw.SizedBox(
+            width: _anchoCantidad,
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -411,8 +933,9 @@ class PdfService {
               ],
             ),
           ),
-          pw.Expanded(
-            flex: _flexPUnit,
+          _espacio(),
+          pw.SizedBox(
+            width: _anchoPUnit,
             child: pw.Text(
               (p.precioVenta ?? 0).toStringAsFixed(2),
               style: const pw.TextStyle(fontSize: 9),
@@ -516,4 +1039,24 @@ class PdfService {
       ),
     );
   }
+}
+
+/// Una firma del pie de un documento de almacén (ver PdfService._firmas).
+class _Firma {
+  final String? nombre;
+  final String cargo;
+  final String detalle;
+  final bool completada;
+
+  /// Lo que se escribe sobre la línea si ese paso ya se hizo pero sin anotar
+  /// un nombre (ej. "Aprobado").
+  final String textoSinNombre;
+
+  const _Firma({
+    required this.nombre,
+    required this.cargo,
+    required this.detalle,
+    required this.completada,
+    this.textoSinNombre = '',
+  });
 }

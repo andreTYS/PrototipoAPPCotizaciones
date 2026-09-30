@@ -96,6 +96,7 @@ class ApiService {
     required String cliente,
     required String rucDni,
     required String notas,
+    String? telefono,
   }) async {
     final uri = Uri.parse('$baseUrl/crm/leads');
     final res = await http
@@ -109,6 +110,7 @@ class ApiService {
             'channel': 'api',
             'nombre_contacto': cliente.isEmpty ? 'Cliente de cotización de campo' : cliente,
             'dni': rucDni.isEmpty ? null : rucDni,
+            'telefono': (telefono == null || telefono.isEmpty) ? null : telefono,
             'origen': 'OTRO',
             'notas': notas,
           }),

@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import '../models/producto.dart';
 
 /// Miniatura de producto para las listas de categoría y de cotización.
 /// Las fotos van empaquetadas dentro de la propia app (assets/productos/),
-/// así que se ven siempre, sin depender de la red ni de haber sincronizado.
+/// así que se ven siempre, sin depender de la red ni de haber sincronizado;
+/// las de productos agregados desde el celular se leen de su archivo.
 class ProductoThumbnail extends StatelessWidget {
   final String? archivoImagen;
   final double size;
@@ -30,13 +33,21 @@ class ProductoThumbnail extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
-      child: Image.asset(
-        'assets/productos/$archivo',
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stack) => placeholder,
-      ),
+      child: esRutaDeArchivo(archivo)
+          ? Image.file(
+              File(archivo),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stack) => placeholder,
+            )
+          : Image.asset(
+              'assets/productos/$archivo',
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stack) => placeholder,
+            ),
     );
   }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El ícono de las notificaciones se pide por nombre desde Dart, así que el
+     compilador no ve que se usa: sin esto lo borraría del APK release y las
+     notificaciones fallarían en silencio. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notificacion" />

@@ -6,8 +6,16 @@ class Producto {
   final String? referenciaInterna;
   final String? unidadMedida;
   final String categoriaProducto;
+
+  /// Nombre de la foto empaquetada en assets/productos/ — o, para un
+  /// producto agregado desde el celular, la ruta absoluta de la foto que se
+  /// le tomó (ver [tieneFotoPropia]).
   final String? archivoImagen;
   final String? imagenUrl;
+
+  /// "catalogo" (del catálogo empaquetado o sincronizado) o "local"
+  /// (agregado a mano desde la app — solo esos se pueden editar/eliminar).
+  final String origen;
 
   Producto({
     this.id,
@@ -19,7 +27,12 @@ class Producto {
     required this.categoriaProducto,
     this.archivoImagen,
     this.imagenUrl,
+    this.origen = 'catalogo',
   });
+
+  bool get esLocal => origen == 'local';
+
+  bool get tieneFotoPropia => esRutaDeArchivo(archivoImagen);
 
   factory Producto.fromMap(Map<String, dynamic> map) {
     return Producto(
@@ -32,6 +45,7 @@ class Producto {
       categoriaProducto: (map['categoria_producto'] ?? 'SIN CATEGORIA').toString(),
       archivoImagen: map['archivo_imagen'],
       imagenUrl: map['imagen_url'],
+      origen: (map['origen'] ?? 'catalogo').toString(),
     );
   }
 
@@ -56,3 +70,7 @@ class Producto {
     };
   }
 }
+
+/// Las fotos del catálogo son nombres de archivo dentro de los assets; las
+/// que se toman desde el celular se guardan con su ruta absoluta.
+bool esRutaDeArchivo(String? archivo) => archivo != null && archivo.startsWith('/');
