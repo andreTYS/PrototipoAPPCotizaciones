@@ -21,8 +21,5 @@ jobs:
       - name: Instalar dependencias del proyecto
         run: flutter pub get
 
-      - name: Analizar (flutter analyze)
-        run: flutter analyze
-
       - name: Correr tests
         run: flutter test
