@@ -200,7 +200,7 @@ class _GenerarCotizacionScreenState extends State<GenerarCotizacionScreen> {
             .map(
               (i) => ItemCotizacionGuardado(
                 nombre: i.producto.nombre,
-                cantidad: i.cantidad.toDouble(),
+                cantidad: i.cantidad,
                 precioUnitario: i.producto.precioVenta ?? 0,
                 archivoImagen: i.producto.archivoImagen,
                 unidadMedida: i.producto.unidadMedida,

@@ -968,7 +968,7 @@ class PdfService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(item.cantidad.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
+                pw.Text('${item.cantidad}', style: const pw.TextStyle(fontSize: 9)),
                 pw.Text(
                   p.unidadMedida ?? '',
                   style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
