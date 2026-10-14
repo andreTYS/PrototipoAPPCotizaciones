@@ -1,13 +1,17 @@
 import 'checklist_categoria.dart';
 
 /// Recorrido de un requerimiento de materiales: se crea pendiente, el jefe
-/// de obra lo aprueba (con su código) y almacén confirma la entrega.
-enum EstadoRequerimiento { pendiente, aprobado, entregado }
+/// de obra lo aprueba (con su código) — desde ahí queda "pendiente de
+/// alistar" como recordatorio para el almacenero —, el almacenero confirma
+/// que está listo para entrega cuando terminó de prepararlo, y por último
+/// confirma la entrega.
+enum EstadoRequerimiento { pendiente, aprobado, listo, entregado }
 
 extension EstadoRequerimientoTexto on EstadoRequerimiento {
   String get etiqueta => switch (this) {
         EstadoRequerimiento.pendiente => 'Pendiente aprobación',
         EstadoRequerimiento.aprobado => 'Aprobado por jefe de obra',
+        EstadoRequerimiento.listo => 'Listo para entrega',
         EstadoRequerimiento.entregado => 'Entregado',
       };
 }
@@ -25,6 +29,8 @@ class Requerimiento {
   final DateTime fechaCreacion;
   final DateTime? fechaAprobacion;
   final String? aprobadoPor;
+  final DateTime? fechaListo;
+  final String? alistadoPor;
   final DateTime? fechaEntrega;
   final String? recibidoPor;
   final String? observaciones;
@@ -40,6 +46,8 @@ class Requerimiento {
     required this.fechaCreacion,
     this.fechaAprobacion,
     this.aprobadoPor,
+    this.fechaListo,
+    this.alistadoPor,
     this.fechaEntrega,
     this.recibidoPor,
     this.observaciones,
@@ -50,7 +58,15 @@ class Requerimiento {
   late final int totalItems = categorias.fold(0, (s, c) => s + c.items.length);
   late final int totalUnidades = categorias.fold(0, (s, c) => s + c.totalUnidades);
 
+  /// Total estimado en soles (cantidad × precio de cada material). Los
+  /// requerimientos anteriores a los precios no lo tienen ([conPrecios]).
+  late final double totalPrecio = totalPrecioCategorias(categorias);
+  late final bool conPrecios = categoriasConPrecios(categorias);
+
   bool get entregado => estado == EstadoRequerimiento.entregado;
+
+  /// Aprobado y todavía sin alistar: el recordatorio para el almacenero.
+  bool get pendienteDeAlistar => estado == EstadoRequerimiento.aprobado;
 
   /// Lo que se muestra en el Inicio: todo lo pendiente de aprobar, y lo
   /// urgente mientras no se haya entregado.
@@ -61,6 +77,8 @@ class Requerimiento {
     EstadoRequerimiento? estado,
     DateTime? fechaAprobacion,
     String? aprobadoPor,
+    DateTime? fechaListo,
+    String? alistadoPor,
     DateTime? fechaEntrega,
     String? recibidoPor,
     // Solo lo usa AlmacenState, para guardar de vuelta el reserva_id/
@@ -77,6 +95,8 @@ class Requerimiento {
       fechaCreacion: fechaCreacion,
       fechaAprobacion: fechaAprobacion ?? this.fechaAprobacion,
       aprobadoPor: aprobadoPor ?? this.aprobadoPor,
+      fechaListo: fechaListo ?? this.fechaListo,
+      alistadoPor: alistadoPor ?? this.alistadoPor,
       fechaEntrega: fechaEntrega ?? this.fechaEntrega,
       recibidoPor: recibidoPor ?? this.recibidoPor,
       observaciones: observaciones,
@@ -98,6 +118,8 @@ class Requerimiento {
       fechaCreacion: DateTime.parse(map['fecha_creacion'] as String),
       fechaAprobacion: DateTime.tryParse((map['fecha_aprobacion'] ?? '').toString()),
       aprobadoPor: map['aprobado_por'] as String?,
+      fechaListo: DateTime.tryParse((map['fecha_listo'] ?? '').toString()),
+      alistadoPor: map['alistado_por'] as String?,
       fechaEntrega: DateTime.tryParse((map['fecha_entrega'] ?? '').toString()),
       recibidoPor: map['recibido_por'] as String?,
       observaciones: map['observaciones'] as String?,
@@ -115,6 +137,8 @@ class Requerimiento {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_aprobacion': fechaAprobacion?.toIso8601String(),
       'aprobado_por': aprobadoPor,
+      'fecha_listo': fechaListo?.toIso8601String(),
+      'alistado_por': alistadoPor,
       'fecha_entrega': fechaEntrega?.toIso8601String(),
       'recibido_por': recibidoPor,
       'observaciones': observaciones,

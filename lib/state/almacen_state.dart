@@ -46,10 +46,19 @@ class AlmacenState extends ChangeNotifier {
     return lista;
   }
 
-  /// Aprobados que todavía no se entregan y que no salen ya en
-  /// [requierenAtencion] (los urgentes van allá).
-  List<Requerimiento> get aprobadosPorEntregar =>
+  /// Aprobados que el almacenero todavía tiene que alistar, y que no salen
+  /// ya en [requierenAtencion] (los urgentes van allá).
+  List<Requerimiento> get pendientesDeAlistar =>
       _requerimientos.where((r) => r.estado == EstadoRequerimiento.aprobado && !r.urgente).toList();
+
+  /// Ya alistados, esperando que se entreguen (sin los urgentes, que van en
+  /// [requierenAtencion]).
+  List<Requerimiento> get listosParaEntrega =>
+      _requerimientos.where((r) => r.estado == EstadoRequerimiento.listo && !r.urgente).toList();
+
+  /// Checklists registrados cuyas herramientas todavía no se confirma que salieron.
+  List<ChecklistHerramientas> get salidasPorConfirmar =>
+      _herramientas.where((h) => h.estado == EstadoHerramientas.registrado).toList();
 
   List<ChecklistHerramientas> get herramientasPorDevolver =>
       _herramientas.where((h) => h.estado == EstadoHerramientas.pendiente).toList();
@@ -66,6 +75,13 @@ class AlmacenState extends ChangeNotifier {
       if (h.id == id) return h;
     }
     return null;
+  }
+
+  /// Solo para pruebas: carga salidas de herramientas sin pasar por la base.
+  @visibleForTesting
+  void herramientasParaPrueba(List<ChecklistHerramientas> lista) {
+    _herramientas = lista;
+    _cargando = false;
   }
 
   Future<void> cargar() async {
@@ -134,6 +150,17 @@ class AlmacenState extends ChangeNotifier {
     );
   }
 
+  /// El almacenero terminó de preparar los materiales.
+  Future<Requerimiento> marcarListoParaEntrega(Requerimiento r, {String? alistadoPor}) {
+    return _actualizarRequerimiento(
+      r.copyWith(
+        estado: EstadoRequerimiento.listo,
+        fechaListo: DateTime.now(),
+        alistadoPor: alistadoPor,
+      ),
+    );
+  }
+
   /// Al entregar, cada ítem con una reserva activa se despacha de verdad
   /// (descuenta stock físico); si el producto es retornable, el ERP crea
   /// el préstamo correspondiente, que después cierra
@@ -183,6 +210,7 @@ class AlmacenState extends ChangeNotifier {
     required String responsable,
     String? observaciones,
     required List<ChecklistCategoriaState> categorias,
+    String? maleta,
   }) async {
     final marcados = soloMarcados(categorias);
     await _reservarYDespacharItemsEnErp(marcados);
@@ -190,6 +218,7 @@ class AlmacenState extends ChangeNotifier {
       numero: await _siguienteNumero('herramientas_correlativo', 'HER'),
       obra: obra,
       responsable: responsable,
+      maleta: maleta,
       fechaSalida: DateTime.now(),
       observaciones: observaciones,
       categoriasJson: categoriasAJson(marcados),
@@ -201,6 +230,27 @@ class AlmacenState extends ChangeNotifier {
     return guardado;
   }
 
+  /// Almacén confirma qué herramientas salieron (las que se marcaron una
+  /// por una en [categorias]): quedan pendientes de devolución.
+  Future<ChecklistHerramientas> confirmarSalida(
+    ChecklistHerramientas h, {
+    required String confirmadaPor,
+    required List<ChecklistCategoriaState> categorias,
+    String? observaciones,
+  }) {
+    final extra = (observaciones ?? '').trim();
+    final previas = (h.observaciones ?? '').trim();
+    return _actualizarHerramientas(
+      h.copyWith(
+        estado: EstadoHerramientas.pendiente,
+        fechaConfirmacionSalida: DateTime.now(),
+        salidaConfirmadaPor: confirmadaPor,
+        categoriasJson: categoriasAJson(categorias),
+        observaciones: extra.isEmpty ? previas : (previas.isEmpty ? extra : '$previas\nSalida: $extra'),
+      ),
+    );
+  }
+
   /// Cierra en el ERP el préstamo de cada ítem que se logró despachar como
   /// tal (repone su stock físico real) antes de marcar el checklist como
   /// conforme. Un ítem que falla queda con su prestamo_id intacto, para
@@ -209,16 +259,22 @@ class AlmacenState extends ChangeNotifier {
     ChecklistHerramientas h, {
     required String encargado,
     String? observaciones,
+    List<ChecklistCategoriaState>? categorias,
   }) async {
-    final categorias = categoriasDesdeJson(h.categoriasJson);
-    await _devolverItemsEnErp(categorias);
-    final actualizado = h.copyWith(
-      estado: EstadoHerramientas.conforme,
-      fechaDevolucion: DateTime.now(),
-      encargado: encargado,
-      observacionesDevolucion: observaciones,
-      categoriasJson: categoriasAJson(categorias),
+    final categoriasFinal = categorias ?? categoriasDesdeJson(h.categoriasJson);
+    await _devolverItemsEnErp(categoriasFinal);
+    return _actualizarHerramientas(
+      h.copyWith(
+        estado: EstadoHerramientas.conforme,
+        fechaDevolucion: DateTime.now(),
+        encargado: encargado,
+        observacionesDevolucion: observaciones,
+        categoriasJson: categoriasAJson(categoriasFinal),
+      ),
     );
+  }
+
+  Future<ChecklistHerramientas> _actualizarHerramientas(ChecklistHerramientas actualizado) async {
     await DbHelper.instance.actualizarChecklistHerramientas(actualizado);
     _herramientas = [
       for (final x in _herramientas) x.id == actualizado.id ? actualizado : x,

@@ -32,6 +32,7 @@ class _AgregarItemChecklistScreenState extends State<AgregarItemChecklistScreen>
   final _unidadOtraController = TextEditingController();
   List<String> _categorias = [];
   List<ItemCatalogoChecklist> _agregados = [];
+  List<ItemCatalogoChecklist> _todos = [];
   String? _categoriaSeleccionada;
   String _unidadSeleccionada = 'Unidades';
   bool _guardando = false;
@@ -55,11 +56,14 @@ class _AgregarItemChecklistScreenState extends State<AgregarItemChecklistScreen>
 
   Future<void> _cargar() async {
     final categorias = await _borrador.nombresCategorias();
-    final agregados = await DbHelper.instance.getItemsCatalogoChecklist(widget.tipo);
+    final todos = await DbHelper.instance.getItemsCatalogoChecklist(widget.tipo);
     if (!mounted) return;
     setState(() {
       _categorias = categorias;
-      _agregados = agregados.reversed.toList();
+      _todos = todos;
+      // Aquí solo se ven (y se pueden quitar) los que se agregaron desde la
+      // app; la lista base completa se cambia desde Configuración.
+      _agregados = todos.where((i) => !i.esBase).toList().reversed.toList();
       // Herramientas tiene una sola categoría: se deja elegida de entrada.
       if (_categoriaSeleccionada == null && categorias.length == 1) _categoriaSeleccionada = categorias.first;
     });
@@ -93,7 +97,7 @@ class _AgregarItemChecklistScreenState extends State<AgregarItemChecklistScreen>
     if (!formOk) return;
 
     final nombre = capitalizarPrimeraLetra(_nombreController.text.trim());
-    final repetido = _agregados.any(
+    final repetido = _todos.any(
       (i) => i.nombre.toLowerCase() == nombre.toLowerCase() && i.categoria == categoria,
     );
     if (repetido) {

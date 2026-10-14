@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/checklist_categoria.dart';
 import '../models/checklist_herramientas.dart';
 import '../models/requerimiento.dart';
@@ -9,8 +11,8 @@ import '../utils/formato.dart';
 import 'animated_pressable.dart';
 
 /// Colores de estado de Almacén — aparte de los de marca, porque tienen que
-/// leerse de un vistazo: ámbar = falta algo, azul = aprobado, verde = listo,
-/// rojo = urgente.
+/// leerse de un vistazo: ámbar = falta algo, azul = aprobado / registrado,
+/// violeta = listo para entrega, verde = terminado, rojo = urgente.
 class ColoresEstado {
   ColoresEstado._();
 
@@ -18,6 +20,8 @@ class ColoresEstado {
   static const pendienteFondo = Color(0xFFFEF3C7);
   static const aprobado = BrandColors.azulOscuro;
   static const aprobadoFondo = Color(0xFFDBEAFE);
+  static const preparado = Color(0xFF6D28D9);
+  static const preparadoFondo = Color(0xFFEDE9FE);
   static const listo = Color(0xFF047857);
   static const listoFondo = Color(0xFFD1FAE5);
   static const urgente = Color(0xFFB91C1C);
@@ -26,10 +30,12 @@ class ColoresEstado {
   static (Color, Color) deRequerimiento(EstadoRequerimiento estado) => switch (estado) {
         EstadoRequerimiento.pendiente => (pendiente, pendienteFondo),
         EstadoRequerimiento.aprobado => (aprobado, aprobadoFondo),
+        EstadoRequerimiento.listo => (preparado, preparadoFondo),
         EstadoRequerimiento.entregado => (listo, listoFondo),
       };
 
   static (Color, Color) deHerramientas(EstadoHerramientas estado) => switch (estado) {
+        EstadoHerramientas.registrado => (aprobado, aprobadoFondo),
         EstadoHerramientas.pendiente => (pendiente, pendienteFondo),
         EstadoHerramientas.conforme => (listo, listoFondo),
       };
@@ -53,6 +59,15 @@ class PildoraEstado extends StatelessWidget {
     final (color, fondo) = ColoresEstado.deHerramientas(estado);
     return PildoraEstado(texto: estado.etiqueta, color: color, fondo: fondo);
   }
+
+  /// Recordatorio para el almacenero mientras un requerimiento aprobado no
+  /// se ha alistado.
+  factory PildoraEstado.porAlistar() => const PildoraEstado(
+        texto: 'Pendiente de alistar',
+        color: ColoresEstado.pendiente,
+        fondo: ColoresEstado.pendienteFondo,
+        icono: Icons.inventory_2_outlined,
+      );
 
   factory PildoraEstado.urgente() => const PildoraEstado(
         texto: 'Urgente',
@@ -180,9 +195,10 @@ class TarjetaRequerimiento extends StatelessWidget {
       colorIcono: urgenteActivo ? ColoresEstado.urgente : colorEstado,
       titulo: r.obra.isEmpty ? 'Obra sin nombre' : r.obra,
       subtitulo:
-          '${r.numero} · ${cantidadConPalabra(r.totalItems, 'ítem', 'ítems')} · ${fechaCorta(r.fechaCreacion)} · ${r.solicitante}',
+          '${r.numero} · ${cantidadConPalabra(r.totalItems, 'ítem', 'ítems')}${r.conPrecios ? ' · ${soles(r.totalPrecio)}' : ''} · ${fechaCorta(r.fechaCreacion)} · ${r.solicitante}',
       pildoras: [
         PildoraEstado.requerimiento(r.estado),
+        if (r.pendienteDeAlistar) PildoraEstado.porAlistar(),
         if (urgenteActivo) PildoraEstado.urgente(),
       ],
       onTap: onTap,
@@ -205,7 +221,7 @@ class TarjetaHerramientas extends StatelessWidget {
       colorIcono: colorEstado,
       titulo: h.obra.isEmpty ? 'Obra sin nombre' : h.obra,
       subtitulo:
-          '${h.numero} · ${cantidadConPalabra(h.totalItems, 'herramienta', 'herramientas')} · ${fechaCorta(h.fechaSalida)} · ${h.responsable}',
+          '${h.numero}${h.maleta == null ? '' : ' · ${h.maleta}'} · ${cantidadConPalabra(h.totalItems, 'herramienta', 'herramientas')} · ${fechaCorta(h.fechaSalida)} · ${h.responsable}',
       pildoras: [PildoraEstado.herramientas(h.estado)],
       onTap: onTap,
     );
@@ -325,11 +341,24 @@ class ListaItemsPorCategoria extends StatelessWidget {
   /// Si ya se entregó/devolvió: cada ítem se ve con su check cian.
   final bool completado;
 
-  const ListaItemsPorCategoria({super.key, required this.categorias, this.completado = false});
+  /// Salidas de herramientas: cada ítem muestra su recorrido (no salió,
+  /// en obra, devuelta, no volvió) según lo que se marcó al confirmar.
+  final bool recorridoHerramientas;
+
+  const ListaItemsPorCategoria({
+    super.key,
+    required this.categorias,
+    this.completado = false,
+    this.recorridoHerramientas = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    // Las salidas por maleta traen foto de cada herramienta; los
+    // requerimientos, el precio de cada material.
+    final conFotos = categorias.any((c) => c.items.any((i) => i.imagen != null));
+    final conPrecios = categoriasConPrecios(categorias);
     return Column(
       children: [
         for (final categoria in categorias)
@@ -370,14 +399,33 @@ class ListaItemsPorCategoria extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          completado ? Icons.check_circle : Icons.radio_button_unchecked,
-                          size: 18,
-                          color: completado ? BrandColors.cian : colorScheme.outline,
-                        ),
+                        if (conFotos) ...[
+                          FotoHerramienta(ruta: item.imagen, titulo: item.texto, tamano: 40),
+                          const SizedBox(width: 10),
+                        ],
+                        if (recorridoHerramientas)
+                          _IconoRecorrido(item: item)
+                        else
+                          Icon(
+                            completado ? Icons.check_circle : Icons.radio_button_unchecked,
+                            size: 18,
+                            color: completado ? BrandColors.cian : colorScheme.outline,
+                          ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(item.texto, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.texto, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
+                              if (conPrecios)
+                                Text(
+                                  item.precio == null
+                                      ? 'Sin precio'
+                                      : '${soles(item.precio!)} c/u · ${soles(item.subtotal)}',
+                                  style: AppTextStyles.apoyo,
+                                ),
+                            ],
+                          ),
                         ),
                         if (item.esExtra) ...[
                           Icon(
@@ -498,6 +546,119 @@ class BotonPrincipal extends StatelessWidget {
   }
 }
 
+/// La foto es un asset de la app (las que vienen con ella) o un archivo del
+/// celular (las que se toman desde Configuración).
+Widget _imagenHerramienta(
+  String ruta, {
+  double? height,
+  ImageErrorWidgetBuilder? errorBuilder,
+}) {
+  return ruta.startsWith('/')
+      ? Image.file(File(ruta), fit: BoxFit.contain, height: height, errorBuilder: errorBuilder)
+      : Image.asset(ruta, fit: BoxFit.contain, height: height, errorBuilder: errorBuilder);
+}
+
+/// Dónde va una herramienta de una salida, según lo marcado al confirmar
+/// la salida y la devolución.
+class _IconoRecorrido extends StatelessWidget {
+  final ChecklistItemEntry item;
+
+  const _IconoRecorrido({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final (icono, color, texto) = switch ((item.salio, item.volvio)) {
+      (false, _) => (Icons.cancel_outlined, ColoresEstado.urgente, 'No salió'),
+      (true, true) => (Icons.check_circle, ColoresEstado.listo, 'Devuelta'),
+      (true, false) => (Icons.error_outline, ColoresEstado.urgente, 'No volvió'),
+      (true, null) => (Icons.outbox_outlined, ColoresEstado.pendiente, 'En obra'),
+      _ => (Icons.radio_button_unchecked, Theme.of(context).colorScheme.outline, 'Por salir'),
+    };
+    return Tooltip(
+      message: texto,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icono, size: 20, color: color),
+          Text(texto, style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Foto de una herramienta (las de las maletas vienen en los assets). Sin
+/// foto muestra un ícono; con foto, tocarla la abre en grande.
+class FotoHerramienta extends StatelessWidget {
+  final String? ruta;
+  final double tamano;
+  final String titulo;
+
+  const FotoHerramienta({super.key, required this.ruta, required this.titulo, this.tamano = 48});
+
+  void _ampliar(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _imagenHerramienta(ruta!, height: 280),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                titulo,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: BrandColors.azulMarino),
+              ),
+              const SizedBox(height: 4),
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cerrar')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final sinFoto = Container(
+      width: tamano,
+      height: tamano,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(Icons.handyman_outlined, size: tamano * 0.45, color: colorScheme.outline),
+    );
+    if (ruta == null) return sinFoto;
+    return GestureDetector(
+      onTap: () => _ampliar(context),
+      child: Container(
+        width: tamano,
+        height: tamano,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: _imagenHerramienta(ruta!, errorBuilder: (_, __, ___) => sinFoto),
+        ),
+      ),
+    );
+  }
+}
+
 /// Acción principal de una lista (Nuevo requerimiento, Registrar salida):
 /// fija abajo de la pantalla, siempre a la vista aunque se desplace la
 /// lista. Va en el bottomNavigationBar del Scaffold.
@@ -520,6 +681,107 @@ class BotonInferiorFijo extends StatelessWidget {
         top: false,
         child: BotonPrincipal(texto: texto, icono: icono, color: BrandColors.cian, onPressed: onPressed),
       ),
+    );
+  }
+}
+
+/// Confirmación de un paso de Almacén que solo pide el nombre de quien lo
+/// hace (Listo para entrega, Confirmar salida). Recuerda el último nombre
+/// escrito en [clavePreferencia] para no tipearlo cada vez. El nombre es
+/// obligatorio. Devuelve el nombre, o null si se canceló.
+class HojaConfirmacionNombre extends StatefulWidget {
+  final String titulo;
+  final String texto;
+  final String etiquetaNombre;
+  final String textoBoton;
+  final Color color;
+  final String clavePreferencia;
+
+  const HojaConfirmacionNombre({
+    super.key,
+    required this.titulo,
+    required this.texto,
+    required this.etiquetaNombre,
+    required this.textoBoton,
+    required this.color,
+    required this.clavePreferencia,
+  });
+
+  @override
+  State<HojaConfirmacionNombre> createState() => _HojaConfirmacionNombreState();
+}
+
+class _HojaConfirmacionNombreState extends State<HojaConfirmacionNombre> {
+  final _nombreController = TextEditingController();
+  bool _faltaNombre = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted && _nombreController.text.isEmpty) {
+        _nombreController.text = prefs.getString(widget.clavePreferencia) ?? '';
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _nombreController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirmar() async {
+    final nombre = _nombreController.text.trim();
+    if (nombre.isEmpty) {
+      setState(() => _faltaNombre = true);
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(widget.clavePreferencia, nombre);
+    if (mounted) Navigator.of(context).pop(nombre);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return HojaAlmacen(
+      titulo: widget.titulo,
+      texto: widget.texto,
+      children: [
+        TextField(
+          controller: _nombreController,
+          textCapitalization: TextCapitalization.words,
+          onChanged: (_) {
+            if (_faltaNombre) setState(() => _faltaNombre = false);
+          },
+          decoration: decoracionCampoHoja('${widget.etiquetaNombre} *', icono: Icons.person_outline)
+              .copyWith(errorText: _faltaNombre ? 'El nombre es obligatorio' : null),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: estiloBotonSecundario,
+                child: const Text('Cancelar'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton(
+                onPressed: _confirmar,
+                style: FilledButton.styleFrom(
+                  backgroundColor: widget.color,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(widget.textoBoton, style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

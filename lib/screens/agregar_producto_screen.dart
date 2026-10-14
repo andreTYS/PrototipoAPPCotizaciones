@@ -200,7 +200,7 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
     setState(() => _guardando = true);
     final producto = Producto(
       id: widget.producto?.id,
-      origen: 'local',
+      origen: widget.producto?.origen ?? 'local',
       archivoImagen: _foto,
       nombre: _nombreController.text.trim(),
       categoriaProducto: categoria,

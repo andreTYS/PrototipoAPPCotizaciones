@@ -81,6 +81,21 @@ class ChecklistItemEntry {
   /// limpia a null en cuanto se confirma la devolución.
   int? prestamoId;
 
+  /// Foto de la herramienta (ruta del asset), para las que salen en una
+  /// maleta armada; las del checklist no la tienen.
+  final String? imagen;
+
+  /// Precio unitario (S/) de un material del requerimiento: viene por
+  /// defecto de la lista de precios de la empresa y se puede cambiar en el
+  /// resumen. Null = sin precio. Las herramientas no lo usan.
+  double? precio;
+
+  /// Herramientas: si realmente salieron a obra / si volvieron, según lo
+  /// que se fue marcando al confirmar la salida y la devolución. Null =
+  /// todavía no se revisó.
+  bool? salio;
+  bool? volvio;
+
   ChecklistItemEntry({
     required this.texto,
     this.cantidad = 0,
@@ -90,9 +105,15 @@ class ChecklistItemEntry {
     this.sku,
     this.reservaId,
     this.prestamoId,
+    this.imagen,
+    this.precio,
+    this.salio,
+    this.volvio,
   });
 
   bool get marcado => cantidad > 0;
+
+  double get subtotal => (precio ?? 0) * cantidad;
 
   /// "× 3" o "× 3 m" — como se muestra la cantidad en pantalla y en el PDF.
   String get cantidadTexto {
@@ -114,6 +135,10 @@ class ChecklistItemEntry {
       sku: json['sku'] as String?,
       reservaId: (json['reserva_id'] as num?)?.toInt(),
       prestamoId: (json['prestamo_id'] as num?)?.toInt(),
+      imagen: json['imagen'] as String?,
+      precio: (json['precio'] as num?)?.toDouble(),
+      salio: json['salio'] as bool?,
+      volvio: json['volvio'] as bool?,
     );
   }
 
@@ -126,6 +151,10 @@ class ChecklistItemEntry {
         if (sku != null) 'sku': sku,
         if (reservaId != null) 'reserva_id': reservaId,
         if (prestamoId != null) 'prestamo_id': prestamoId,
+        if (imagen != null) 'imagen': imagen,
+        if (precio != null) 'precio': precio,
+        if (salio != null) 'salio': salio,
+        if (volvio != null) 'volvio': volvio,
       };
 }
 
@@ -151,6 +180,7 @@ class ChecklistCategoriaState {
 
   int get totalMarcados => items.where((i) => i.marcado).length;
   int get totalUnidades => items.fold(0, (s, i) => s + i.cantidad);
+  double get totalPrecio => items.fold(0.0, (s, i) => s + i.subtotal);
 }
 
 /// Reconstruye las categorías guardadas de un checklist (para su pantalla
@@ -178,3 +208,12 @@ List<ChecklistCategoriaState> soloMarcados(List<ChecklistCategoriaState> categor
 
 String categoriasAJson(List<ChecklistCategoriaState> categorias) =>
     jsonEncode(categorias.map((c) => c.toJson()).toList());
+
+/// Total en soles de lo que se pidió (cantidad × precio de cada ítem).
+double totalPrecioCategorias(List<ChecklistCategoriaState> categorias) =>
+    categorias.fold(0.0, (s, c) => s + c.totalPrecio);
+
+/// Si algún ítem trae precio (los requerimientos guardados antes de que
+/// existieran los precios no lo tienen, y no se muestran columnas vacías).
+bool categoriasConPrecios(List<ChecklistCategoriaState> categorias) =>
+    categorias.any((c) => c.items.any((i) => i.precio != null));

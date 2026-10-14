@@ -51,7 +51,7 @@ class _HojaAgregarItemState extends State<_HojaAgregarItem> {
     super.dispose();
   }
 
-  Future<void> _agregar(String texto, {bool esProducto = false, String? sku}) async {
+  Future<void> _agregar(String texto, {bool esProducto = false, String? sku, double? precio}) async {
     final limpio = texto.trim();
     if (limpio.isEmpty || _guardando) return;
     setState(() => _guardando = true);
@@ -77,7 +77,7 @@ class _HojaAgregarItemState extends State<_HojaAgregarItem> {
       }
     }
 
-    widget.checklist.agregarItemEn(widget.categoriaIndex, limpio, esProducto: esProducto, sku: sku);
+    widget.checklist.agregarItemEn(widget.categoriaIndex, limpio, esProducto: esProducto, sku: sku, precio: precio);
     if (mounted) Navigator.pop(context);
   }
 
@@ -93,7 +93,12 @@ class _HojaAgregarItemState extends State<_HojaAgregarItem> {
       // sincronizado de ahí — para uno agregado a mano queda null, y el
       // ítem se comporta como cualquier otro de texto libre (sin reservar
       // stock real). Ver ChecklistItemEntry.sku.
-      await _agregar(producto.nombre, esProducto: true, sku: producto.referenciaInterna);
+      await _agregar(
+        producto.nombre,
+        esProducto: true,
+        sku: producto.referenciaInterna,
+        precio: producto.precioVenta,
+      );
     }
   }
 

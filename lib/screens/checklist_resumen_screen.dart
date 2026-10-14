@@ -21,12 +21,12 @@ import 'documento_creado_screen.dart';
 import 'herramientas_detalle_screen.dart';
 import 'requerimiento_detalle_screen.dart';
 
-/// Resumen final del checklist, después de pasar por las categorías: un
-/// vistazo por categoría (tocar una vuelve a ella para revisar o agregar
-/// algo) y los datos del documento. Para materiales, "Enviar para
+/// Resumen final del checklist, después de pasar por las categorías: lo
+/// marcado en cada categoría con su cantidad (tocar una vuelve a ella para
+/// corregir o agregar algo) y los datos del documento. Para materiales, "Enviar para
 /// aprobación" crea el requerimiento (pendiente, con aviso en el celular);
-/// para herramientas, "Registrar salida" deja las herramientas pendientes
-/// de devolución. En ambos casos se genera el PDF y se muestra la
+/// para herramientas, "Registrar checklist" lo deja registrado, a la espera
+/// de que almacén confirme la salida. En ambos casos se genera el PDF y se muestra la
 /// confirmación con su vista previa.
 class ChecklistResumenScreen extends StatefulWidget {
   const ChecklistResumenScreen({super.key});
@@ -52,14 +52,15 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarUltimaPersona();
-  }
-
-  Future<void> _cargarUltimaPersona() async {
-    final prefs = await SharedPreferences.getInstance();
-    final ultima = prefs.getString(_clavePersona) ?? '';
-    if (!mounted || _personaController.text.isNotEmpty) return;
-    setState(() => _personaController.text = ultima);
+    // Los datos se completaron antes de empezar el checklist; aquí se ven
+    // de nuevo y todavía se pueden corregir.
+    final datos = context.read<ChecklistState>().datos;
+    if (datos != null) {
+      _obraController.text = datos.obra;
+      _personaController.text = datos.persona;
+      _observacionesController.text = datos.observaciones;
+      _urgente = datos.urgente;
+    }
   }
 
   @override
@@ -193,9 +194,9 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(
                 builder: (_) => DocumentoCreadoScreen(
-                  titulo: 'Salida registrada',
+                  titulo: 'Checklist registrado',
                   detalle:
-                      '${salida.numero} · ${cantidadConPalabra(salida.totalItems, 'herramienta', 'herramientas')} · pendiente de devolución',
+                      '${salida.numero} · ${cantidadConPalabra(salida.totalItems, 'herramienta', 'herramientas')} · falta confirmar la salida',
                   bytes: bytes,
                   nombreArchivo: 'herramientas_${salida.numero}.pdf',
                   textoBotonCompartir: 'COMPARTIR CHECKLIST',
@@ -218,6 +219,41 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
         ),
       ),
     );
+  }
+
+  /// El precio viene de la lista de la empresa, pero se puede cambiar para
+  /// este requerimiento (o poner uno si el material no lo tenía).
+  Future<void> _editarPrecio(ChecklistState checklist, ChecklistItemEntry item) async {
+    final controller = TextEditingController(text: item.precio?.toStringAsFixed(2) ?? '');
+    final resultado = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Precio unitario'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${item.texto} ${item.cantidadTexto}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+              decoration: const InputDecoration(prefixText: 'S/ ', labelText: 'Precio por unidad'),
+              onSubmitted: (v) => Navigator.pop(dialogContext, v),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text), child: const Text('Guardar')),
+        ],
+      ),
+    );
+    if (resultado == null) return;
+    final texto = resultado.trim().replaceAll(',', '.');
+    checklist.setPrecio(item, texto.isEmpty ? null : double.tryParse(texto));
   }
 
   Future<void> _empezarNuevo(ChecklistState checklist) async {
@@ -388,15 +424,20 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
                       ),
                       if (_esMateriales) ...[
                         const SizedBox(height: 6),
-                        SwitchListTile(
-                          value: _urgente,
-                          onChanged: (v) => setState(() => _urgente = v),
-                          contentPadding: EdgeInsets.zero,
-                          activeThumbColor: Colors.white,
-                          activeTrackColor: ColoresEstado.urgente,
-                          title: const Text('Marcar como urgente',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                          subtitle: const Text('Aparece primero en el Inicio, en rojo', style: TextStyle(fontSize: 12)),
+                        // Material propio: el fondo de la tarjeta taparía el efecto al tocar.
+                        Material(
+                          type: MaterialType.transparency,
+                          child: SwitchListTile(
+                            value: _urgente,
+                            onChanged: (v) => setState(() => _urgente = v),
+                            contentPadding: EdgeInsets.zero,
+                            activeThumbColor: Colors.white,
+                            activeTrackColor: ColoresEstado.urgente,
+                            title: const Text('Marcar como urgente',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                            subtitle:
+                                const Text('Aparece primero en el Inicio, en rojo', style: TextStyle(fontSize: 12)),
+                          ),
                         ),
                       ],
                     ],
@@ -404,7 +445,7 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
                   const SizedBox(height: 4),
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 10),
-                    child: Text('RESUMEN POR CATEGORÍA',
+                    child: Text('LO QUE MARCASTE · TOCA UNA CATEGORÍA PARA CORREGIR',
                         style: AppTextStyles.etiqueta.copyWith(color: BrandColors.azulMarino)),
                   ),
                   Container(
@@ -420,6 +461,8 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
                           _FilaResumenCategoria(
                             categoria: entry.value,
                             esUltima: entry.key == checklist.categorias.length - 1,
+                            conPrecios: _esMateriales,
+                            onEditarPrecio: (item) => _editarPrecio(checklist, item),
                             onTap: () {
                               checklist.irACategoria(entry.key);
                               Navigator.of(context).pop();
@@ -428,6 +471,37 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
                       ],
                     ),
                   ),
+                  if (_esMateriales) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: BrandColors.azulMarino,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'TOTAL ESTIMADO',
+                              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12),
+                            ),
+                          ),
+                          Text(
+                            soles(checklist.totalPrecio),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(4, 6, 4, 0),
+                      child: Text(
+                        'Precios por defecto de la lista de la empresa. Toca un precio para cambiarlo.',
+                        style: AppTextStyles.apoyo,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -453,7 +527,7 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
                             : Text(
-                                _esMateriales ? 'ENVIAR PARA APROBACIÓN' : 'REGISTRAR SALIDA',
+                                _esMateriales ? 'ENVIAR PARA APROBACIÓN' : 'REGISTRAR CHECKLIST',
                                 style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.6),
                               ),
                       ),
@@ -483,45 +557,158 @@ class _ChecklistResumenScreenState extends State<ChecklistResumenScreen> {
   }
 }
 
-/// Fila plana de una categoría en el resumen: nombre + cuántos se marcaron.
-/// Tocarla vuelve a esa categoría (útil junto con "+ Añadir objeto a este
-/// paso" de cada pantalla).
+/// Una categoría en el resumen: nombre + cuántos se marcaron, y debajo el
+/// detalle de lo marcado con su cantidad, para revisar todo antes de
+/// enviar. Tocar el encabezado vuelve a esa categoría para corregir o
+/// agregar algo (útil junto con "+ Añadir objeto a este paso").
 class _FilaResumenCategoria extends StatelessWidget {
   final ChecklistCategoriaState categoria;
   final bool esUltima;
   final VoidCallback onTap;
 
-  const _FilaResumenCategoria({required this.categoria, required this.esUltima, required this.onTap});
+  /// Requerimientos de materiales: cada ítem muestra su precio (tocarlo
+  /// lo cambia) y el subtotal.
+  final bool conPrecios;
+  final ValueChanged<ChecklistItemEntry> onEditarPrecio;
+
+  const _FilaResumenCategoria({
+    required this.categoria,
+    required this.esUltima,
+    required this.onTap,
+    required this.conPrecios,
+    required this.onEditarPrecio,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final marcados = categoria.totalMarcados;
+    final marcados = categoria.items.where((i) => i.marcado).toList();
 
+    return Container(
+      decoration: BoxDecoration(
+        border: esUltima ? null : Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      quitarNumeroCategoria(categoria.nombre),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    ),
+                  ),
+                  Text(
+                    '${marcados.length} / ${categoria.items.length}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                      color: marcados.isNotEmpty ? BrandColors.cian : colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.edit_outlined, size: 17, color: colorScheme.onSurfaceVariant),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: marcados.isEmpty
+                ? Text(
+                    'Nada marcado en esta categoría',
+                    style: TextStyle(fontSize: 12.5, color: colorScheme.onSurfaceVariant),
+                  )
+                : Column(
+                    children: [
+                      for (final item in marcados)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Icon(Icons.check_circle, size: 15, color: BrandColors.cian),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  item.texto,
+                                  style: const TextStyle(fontSize: 13, height: 1.3),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                item.cantidadTexto,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: BrandColors.azulMarino,
+                                ),
+                              ),
+                              if (conPrecios) ...[
+                                const SizedBox(width: 8),
+                                _ChipPrecio(item: item, onTap: () => onEditarPrecio(item)),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Precio de un material en el resumen: "S/ 3.00 c/u" y el subtotal; sin
+/// precio, invita a ponerlo. Tocarlo abre la edición.
+class _ChipPrecio extends StatelessWidget {
+  final ChecklistItemEntry item;
+  final VoidCallback onTap;
+
+  const _ChipPrecio({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final sinPrecio = item.precio == null;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        constraints: const BoxConstraints(minWidth: 92),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          border: esUltima ? null : Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+          color: sinPrecio ? ColoresEstado.pendienteFondo : BrandColors.cian.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Expanded(
-              child: Text(
-                quitarNumeroCategoria(categoria.nombre),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  sinPrecio ? 'Poner precio' : soles(item.subtotal),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: sinPrecio ? ColoresEstado.pendiente : BrandColors.azulMarino,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.edit, size: 12, color: sinPrecio ? ColoresEstado.pendiente : BrandColors.cian),
+              ],
             ),
-            Text(
-              '$marcados / ${categoria.items.length}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13.5,
-                color: marcados > 0 ? BrandColors.cian : colorScheme.onSurfaceVariant,
-              ),
-            ),
+            if (!sinPrecio)
+              Text('${soles(item.precio!)} c/u', style: const TextStyle(fontSize: 10.5, color: BrandColors.grisApoyo)),
           ],
         ),
       ),

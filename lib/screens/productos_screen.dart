@@ -42,10 +42,14 @@ class _ProductosScreenState extends State<ProductosScreen> {
   void initState() {
     super.initState();
     _cargar();
+    // Si desde Configuración se agrega, edita o elimina un producto, esta
+    // lista se actualiza sola.
+    DbHelper.instance.catalogoCambios.addListener(_cargar);
   }
 
   @override
   void dispose() {
+    DbHelper.instance.catalogoCambios.removeListener(_cargar);
     _busquedaController.dispose();
     super.dispose();
   }

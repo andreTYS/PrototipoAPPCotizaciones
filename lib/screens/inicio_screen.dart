@@ -8,15 +8,15 @@ import '../widgets/almacen_widgets.dart';
 import '../widgets/animated_pressable.dart';
 import '../widgets/brand_icon.dart';
 import '../widgets/fade_slide_in.dart';
-import 'config_screen.dart';
+import 'configuracion_screen.dart';
 import 'herramientas_detalle_screen.dart';
 import 'herramientas_screen.dart';
 import 'requerimiento_detalle_screen.dart';
 import 'requerimientos_screen.dart';
 
 /// Pestaña "Inicio": tablero con lo que requiere atención — requerimientos
-/// urgentes o pendientes de aprobación, aprobados que falta entregar, y
-/// herramientas que no han vuelto — más los accesos a Almacén y Cotización.
+/// urgentes o pendientes de aprobación, aprobados que falta alistar, listos
+/// para entrega, salidas de herramientas por confirmar y las que no han vuelto — más los accesos a Almacén y Cotización.
 /// No hay sistema de usuarios en la app, así que el saludo es genérico.
 class InicioScreen extends StatelessWidget {
   const InicioScreen({super.key});
@@ -30,10 +30,16 @@ class InicioScreen extends StatelessWidget {
     final almacen = context.watch<AlmacenState>();
     final navegacion = context.read<NavegacionState>();
     final atencion = almacen.requierenAtencion;
-    final porEntregar = almacen.aprobadosPorEntregar;
+    final porAlistar = almacen.pendientesDeAlistar;
+    final listos = almacen.listosParaEntrega;
+    final salidasPorConfirmar = almacen.salidasPorConfirmar;
     final herramientas = almacen.herramientasPorDevolver;
     final pendientes = almacen.pendientesAprobacion.length;
-    final todoAlDia = atencion.isEmpty && porEntregar.isEmpty && herramientas.isEmpty;
+    final todoAlDia = atencion.isEmpty &&
+        porAlistar.isEmpty &&
+        listos.isEmpty &&
+        salidasPorConfirmar.isEmpty &&
+        herramientas.isEmpty;
 
     var indice = 0;
 
@@ -68,8 +74,8 @@ class InicioScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   _BotonCuadrado(
                     icono: Icons.settings_outlined,
-                    tooltip: 'Sincronizar catálogo',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfigScreen())),
+                    tooltip: 'Configuración',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracionScreen())),
                   ),
                 ],
               ),
@@ -163,35 +169,43 @@ class InicioScreen extends StatelessWidget {
                       ),
                     ),
                 ],
-                if (porEntregar.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  const TituloSeccion('APROBADOS, FALTA ENTREGAR'),
-                  for (final r in porEntregar)
-                    FadeSlideIn(
-                      index: indice++,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: TarjetaRequerimiento(requerimiento: r, onTap: () => _abrirRequerimiento(context, r.id!)),
+                for (final (titulo, lista) in [
+                  ('APROBADOS · PENDIENTE DE ALISTAR', porAlistar),
+                  ('LISTOS PARA ENTREGA', listos),
+                ])
+                  if (lista.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    TituloSeccion(titulo),
+                    for (final r in lista)
+                      FadeSlideIn(
+                        index: indice++,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: TarjetaRequerimiento(requerimiento: r, onTap: () => _abrirRequerimiento(context, r.id!)),
+                        ),
                       ),
-                    ),
-                ],
-                if (herramientas.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  const TituloSeccion('HERRAMIENTAS POR DEVOLVER'),
-                  for (final h in herramientas)
-                    FadeSlideIn(
-                      index: indice++,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: TarjetaHerramientas(
-                          checklist: h,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => HerramientasDetalleScreen(id: h.id!)),
+                  ],
+                for (final (titulo, lista) in [
+                  ('SALIDAS DE HERRAMIENTAS POR CONFIRMAR', salidasPorConfirmar),
+                  ('HERRAMIENTAS POR DEVOLVER', herramientas),
+                ])
+                  if (lista.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    TituloSeccion(titulo),
+                    for (final h in lista)
+                      FadeSlideIn(
+                        index: indice++,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: TarjetaHerramientas(
+                            checklist: h,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => HerramientasDetalleScreen(id: h.id!)),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
               ],
             ],
           ),

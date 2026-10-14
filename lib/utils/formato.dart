@@ -13,3 +13,10 @@ String fechaCortaConHora(DateTime fecha) =>
 
 /// "1 ítem" / "3 ítems" (o la palabra que se pase).
 String cantidadConPalabra(int n, String singular, String plural) => n == 1 ? '1 $singular' : '$n $plural';
+
+/// "S/ 1,234.50" — precios de materiales (mismo formato que la cotización).
+String soles(double monto) {
+  final partes = monto.toStringAsFixed(2).split('.');
+  final entero = partes[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+  return 'S/ $entero.${partes[1]}';
+}

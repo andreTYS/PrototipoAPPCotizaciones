@@ -1,0 +1,343 @@
+[
+ {
+  "nombre": "Maleta fotovoltaica 1",
+  "carpeta": "maleta1",
+  "categorias": [
+   {
+    "nombre": "Primer nivel",
+    "items": [
+     {
+      "nombre": "Caja de terminales truper",
+      "imagen": "foto01.jpg"
+     },
+     {
+      "nombre": "Pistola de calor",
+      "imagen": "foto02.jpg"
+     },
+     {
+      "nombre": "Aplicador",
+      "imagen": "foto03.jpg"
+     },
+     {
+      "nombre": "Prensa terminal hidráulica",
+      "imagen": "foto04.jpg"
+     },
+     {
+      "nombre": "Discos de corte para metal 4\"",
+      "imagen": null
+     }
+    ]
+   },
+   {
+    "nombre": "Segundo nivel",
+    "items": [
+     {
+      "nombre": "Materiales Conduit",
+      "imagen": null
+     },
+     {
+      "nombre": "Materiales fotovoltaicos",
+      "imagen": null
+     },
+     {
+      "nombre": "Materiales eléctricos",
+      "imagen": null
+     }
+    ]
+   },
+   {
+    "nombre": "Tercer nivel",
+    "items": [
+     {
+      "nombre": "Prensadora terminal tubular",
+      "imagen": "foto05.jpg"
+     },
+     {
+      "nombre": "Prensadora terminal para MC4",
+      "imagen": "foto06.jpg"
+     },
+     {
+      "nombre": "Juego de llaves Allen",
+      "imagen": "foto07.jpg"
+     },
+     {
+      "nombre": "Brocas para concreto",
+      "imagen": "foto08.jpg"
+     },
+     {
+      "nombre": "Alicate Crimpador Prensa Terminal",
+      "imagen": "foto09.jpg"
+     },
+     {
+      "nombre": "Prensadora terminal RJ 45",
+      "imagen": "foto10.jpg"
+     },
+     {
+      "nombre": "Pelador de cables grandes",
+      "imagen": "foto11.jpg"
+     },
+     {
+      "nombre": "Corta cable total",
+      "imagen": "foto12.jpg"
+     },
+     {
+      "nombre": "Flexómetro",
+      "imagen": "foto13.jpg"
+     },
+     {
+      "nombre": "Alicate de pinza",
+      "imagen": "foto14.jpg"
+     },
+     {
+      "nombre": "Alicate de corte",
+      "imagen": "foto15.jpg"
+     },
+     {
+      "nombre": "Alicate de fuerza",
+      "imagen": "foto16.jpg"
+     },
+     {
+      "nombre": "Juego de desarmadores Truper",
+      "imagen": "foto17.jpg"
+     },
+     {
+      "nombre": "Cúter",
+      "imagen": "foto18.jpg"
+     },
+     {
+      "nombre": "Martillo",
+      "imagen": "foto19.jpg"
+     },
+     {
+      "nombre": "Juego de dados Ratchet",
+      "imagen": "foto20.jpg"
+     },
+     {
+      "nombre": "Alicate de presión",
+      "imagen": "foto21.jpg"
+     },
+     {
+      "nombre": "Desarmador doble punta Ujustools",
+      "imagen": "foto22.jpg"
+     },
+     {
+      "nombre": "Tijera de corte aviador",
+      "imagen": "foto23.jpg"
+     },
+     {
+      "nombre": "Puntero estrella",
+      "imagen": "foto24.jpg"
+     },
+     {
+      "nombre": "Dados 3/8",
+      "imagen": "foto25.jpg"
+     },
+     {
+      "nombre": "Dados 5/16",
+      "imagen": "foto26.jpg"
+     },
+     {
+      "nombre": "Dados 7/16",
+      "imagen": "foto27.jpg"
+     },
+     {
+      "nombre": "Escuadra",
+      "imagen": "foto28.jpg"
+     },
+     {
+      "nombre": "Juego de brocas escalonadas",
+      "imagen": "foto29.jpg"
+     },
+     {
+      "nombre": "Nivel de mano",
+      "imagen": "foto30.jpg"
+     },
+     {
+      "nombre": "Prensa terminales tubular ojal",
+      "imagen": "foto31.jpg"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "nombre": "Maleta 2 - Blanca",
+  "carpeta": "maleta2",
+  "categorias": [
+   {
+    "nombre": "Primer nivel",
+    "items": [
+     {
+      "nombre": "Caja de terminales truper",
+      "imagen": "foto01.jpg"
+     },
+     {
+      "nombre": "Pistola de calor",
+      "imagen": null
+     },
+     {
+      "nombre": "Aplicador",
+      "imagen": "foto02.jpg"
+     },
+     {
+      "nombre": "Prensa terminal hidráulica",
+      "imagen": "foto03.jpg"
+     },
+     {
+      "nombre": "Discos de corte para metal 4\"",
+      "imagen": null
+     }
+    ]
+   },
+   {
+    "nombre": "Segundo nivel",
+    "items": [
+     {
+      "nombre": "Materiales Conduit",
+      "imagen": null
+     },
+     {
+      "nombre": "Materiales fotovoltaicos",
+      "imagen": null
+     },
+     {
+      "nombre": "Materiales eléctricos",
+      "imagen": null
+     }
+    ]
+   },
+   {
+    "nombre": "Tercer nivel",
+    "items": [
+     {
+      "nombre": "Prensadora terminal tubular",
+      "imagen": null
+     },
+     {
+      "nombre": "Prensadora terminal para MC4",
+      "imagen": null
+     },
+     {
+      "nombre": "Juego de llaves Allen",
+      "imagen": "foto04.jpg"
+     },
+     {
+      "nombre": "Brocas para concreto",
+      "imagen": null
+     },
+     {
+      "nombre": "Alicate Crimpador Prensa Terminal",
+      "imagen": null
+     },
+     {
+      "nombre": "Prensadora terminal RJ 45",
+      "imagen": "foto05.jpg"
+     },
+     {
+      "nombre": "Pelador de cables grandes",
+      "imagen": "foto06.jpg"
+     },
+     {
+      "nombre": "Corta cable total",
+      "imagen": "foto07.jpg"
+     },
+     {
+      "nombre": "Flexómetro",
+      "imagen": "foto08.jpg"
+     },
+     {
+      "nombre": "Alicate de pinza",
+      "imagen": "foto09.jpg"
+     },
+     {
+      "nombre": "Alicate de corte",
+      "imagen": "foto10.jpg"
+     },
+     {
+      "nombre": "Alicate de fuerza",
+      "imagen": "foto11.jpg"
+     },
+     {
+      "nombre": "Juego de desarmadores Truper",
+      "imagen": "foto12.jpg"
+     },
+     {
+      "nombre": "Cúter",
+      "imagen": "foto13.jpg"
+     },
+     {
+      "nombre": "Martillo",
+      "imagen": "foto14.jpg"
+     },
+     {
+      "nombre": "Juego de dados Ratchet",
+      "imagen": null
+     },
+     {
+      "nombre": "Alicate de presión",
+      "imagen": null
+     },
+     {
+      "nombre": "Desarmador doble punta Ujustools",
+      "imagen": null
+     },
+     {
+      "nombre": "Tijera de corte aviador",
+      "imagen": null
+     },
+     {
+      "nombre": "Puntero estrella",
+      "imagen": "foto15.jpg"
+     },
+     {
+      "nombre": "Dados 3/8",
+      "imagen": "foto16.jpg"
+     },
+     {
+      "nombre": "Dados 5/16",
+      "imagen": "foto17.jpg"
+     },
+     {
+      "nombre": "Dados 7/16",
+      "imagen": "foto18.jpg"
+     },
+     {
+      "nombre": "Escuadra",
+      "imagen": "foto19.jpg"
+     },
+     {
+      "nombre": "Juego de brocas escalonadas",
+      "imagen": null
+     },
+     {
+      "nombre": "Nivel de mano",
+      "imagen": "foto20.jpg"
+     },
+     {
+      "nombre": "Prensa terminales tubular ojal",
+      "imagen": "foto21.jpg"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "nombre": "Maletas TLD-AML",
+  "carpeta": "tld_aml",
+  "categorias": [
+   {
+    "nombre": "Primer nivel",
+    "items": [
+     {
+      "nombre": "TLD-TOTAL-001",
+      "imagen": "foto01.jpg"
+     },
+     {
+      "nombre": "AML-DONGCHEN-001",
+      "imagen": "foto02.jpg"
+     }
+    ]
+   }
+  ]
+ }
+]

@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import '../models/checklist_categoria.dart';
+import '../models/datos_almacen.dart';
 import '../models/item_catalogo_checklist.dart';
 import '../services/db_helper.dart';
 import '../utils/checklist_estilo.dart';
@@ -21,6 +20,10 @@ class ChecklistState extends ChangeNotifier {
 
   List<ChecklistCategoriaState> _categorias = [];
   int _indice = 0;
+
+  /// Obra, solicitante/responsable, etc. — se piden antes de empezar.
+  DatosAlmacen? datos;
+
   bool _cargando = true;
   String? _error;
 
@@ -40,6 +43,9 @@ class ChecklistState extends ChangeNotifier {
   int get totalItems => _categorias.fold(0, (s, c) => s + c.items.length);
   int get totalMarcados => _categorias.fold(0, (s, c) => s + c.totalMarcados);
 
+  /// Total en soles de lo marcado (solo requerimientos de materiales).
+  double get totalPrecio => totalPrecioCategorias(_categorias);
+
   /// Avance por CATEGORÍAS ya completadas, no por ítems marcados: esto es
   /// una revisión de qué llevar (no siempre se lleva todo), así que pasar
   /// de categoría sube el % aunque no se haya marcado nada en ella. Arranca
@@ -47,32 +53,30 @@ class ChecklistState extends ChangeNotifier {
   /// última (en el resumen), no mientras aún se está en ella.
   int get porcentajeAvance => _categorias.isEmpty ? 0 : ((_indice / _categorias.length) * 100).round();
 
-  Future<void> cargar() async {
-    if (_categorias.isNotEmpty) return;
-    await _cargarDesdeAssets();
+  /// Después de cambiar las listas en Configuración: si este checklist no
+  /// tiene nada avanzado, se vuelve a armar con la lista nueva la próxima
+  /// vez que se abra (uno ya empezado se deja como está).
+  void invalidarSiSinProgreso() {
+    if (_categorias.isEmpty || tieneProgreso) return;
+    _categorias = [];
+    _cargando = true;
+    _indice = 0;
+    datos = null;
   }
 
-  Future<void> _cargarDesdeAssets() async {
+  Future<void> cargar() async {
+    if (_categorias.isNotEmpty) return;
+    await _cargarDesdeBase();
+  }
+
+  /// La lista sale de la base (lista base de la empresa + lo agregado o
+  /// cambiado desde Configuración): categorías en orden, cada ítem con su
+  /// unidad y, en materiales, su precio por defecto.
+  Future<void> _cargarDesdeBase() async {
     try {
-      final raw = await rootBundle.loadString('assets/checklist_seed.json');
-      final List<dynamic> data = jsonDecode(raw);
-      final seed = data
-          .map((e) => ChecklistCategoriaSeed.fromMap(Map<String, dynamic>.from(e)))
-          .where((c) => tipoDeCategoriaSeed(c.categoria) == tipo)
-          .toList()
-        ..sort((a, b) => a.orden.compareTo(b.orden));
-
-      final categorias = seed
-          .map(
-            (c) => ChecklistCategoriaState(
-              nombre: c.categoria,
-              items: c.items.map((texto) => ChecklistItemEntry(texto: capitalizarPrimeraLetra(texto))).toList(),
-            ),
-          )
-          .toList();
-
-      final agregados = await DbHelper.instance.getItemsCatalogoChecklist(tipo);
-      for (final item in agregados) {
+      final items = await DbHelper.instance.getItemsCatalogoChecklist(tipo);
+      final categorias = <ChecklistCategoriaState>[];
+      for (final item in items) {
         _incorporar(categorias, item);
       }
 
@@ -80,17 +84,17 @@ class ChecklistState extends ChangeNotifier {
       _indice = 0;
       _error = null;
     } catch (e) {
-      // Sin este catch, un catálogo de checklist corrupto deja la pantalla
-      // girando en el spinner para siempre, sin ninguna pista de qué falló.
+      // Sin este catch, una lista corrupta deja la pantalla girando en el
+      // spinner para siempre, sin ninguna pista de qué falló.
       _error = 'No se pudo cargar el checklist.\n\n$e';
     }
     _cargando = false;
     notifyListeners();
   }
 
-  /// Suma un ítem agregado a la lista base en su categoría (o en una nueva,
-  /// al final, si esa categoría no existe en el Excel) — sin repetirlo si ya
-  /// había uno con el mismo nombre.
+  /// Suma un ítem de la lista a su categoría (o a una nueva, al final, si
+  /// esa categoría todavía no existe) — sin repetirlo si ya había uno con el
+  /// mismo nombre.
   static void _incorporar(List<ChecklistCategoriaState> categorias, ItemCatalogoChecklist item) {
     final nombre = capitalizarPrimeraLetra(item.nombre.trim());
     if (nombre.isEmpty) return;
@@ -100,7 +104,13 @@ class ChecklistState extends ChangeNotifier {
       categorias.add(categoria);
     }
     final yaEsta = categoria.items.any((i) => i.texto.toLowerCase() == nombre.toLowerCase());
-    if (!yaEsta) categoria.items.add(ChecklistItemEntry(texto: nombre, unidad: item.unidad));
+    if (!yaEsta) {
+      categoria.items.add(ChecklistItemEntry(
+        texto: nombre,
+        unidad: item.unidad,
+        precio: item.tipoEsMateriales ? item.precio : null,
+      ));
+    }
   }
 
   static ChecklistCategoriaState? _buscarCategoria(List<ChecklistCategoriaState> categorias, String nombre) {
@@ -153,8 +163,9 @@ class ChecklistState extends ChangeNotifier {
   }
 
   /// Agrega un ítem nuevo (ya marcado) a una categoría cualquiera, solo para
-  /// este checklist.
-  void agregarItemEn(int categoriaIndex, String texto, {bool esProducto = false, String? sku}) {
+  /// este checklist. [precio] viene del catálogo cuando se agrega un
+  /// producto (o queda sin precio, para ponerlo en el resumen).
+  void agregarItemEn(int categoriaIndex, String texto, {bool esProducto = false, String? sku, double? precio}) {
     final limpio = texto.trim();
     if (limpio.isEmpty) return;
     _categorias[categoriaIndex].items.add(
@@ -164,8 +175,15 @@ class ChecklistState extends ChangeNotifier {
             esExtra: true,
             esProducto: esProducto,
             sku: sku,
+            precio: tipo == TipoChecklist.materiales ? precio : null,
           ),
         );
+    notifyListeners();
+  }
+
+  /// Cambia el precio unitario de un material (desde el resumen).
+  void setPrecio(ChecklistItemEntry item, double? precio) {
+    item.precio = precio;
     notifyListeners();
   }
 
@@ -193,9 +211,10 @@ class ChecklistState extends ChangeNotifier {
   /// extras) para empezar uno nuevo.
   Future<void> reiniciar() async {
     _categorias = [];
+    datos = null;
     _cargando = true;
     notifyListeners();
-    await _cargarDesdeAssets();
+    await _cargarDesdeBase();
   }
 }
 
@@ -208,4 +227,9 @@ class BorradoresChecklist {
   final herramientas = ChecklistState(TipoChecklist.herramientas);
 
   ChecklistState de(TipoChecklist tipo) => tipo == TipoChecklist.materiales ? materiales : herramientas;
+
+  void listasCambiadas() {
+    materiales.invalidarSiSinProgreso();
+    herramientas.invalidarSiSinProgreso();
+  }
 }

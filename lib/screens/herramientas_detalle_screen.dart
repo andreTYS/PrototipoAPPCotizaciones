@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/checklist_herramientas.dart';
 import '../services/pdf_service.dart';
 import '../state/almacen_state.dart';
@@ -13,11 +12,13 @@ import '../utils/formato.dart';
 import '../utils/texto_compartir.dart';
 import '../widgets/almacen_widgets.dart';
 import '../widgets/encabezado_curvo.dart';
+import 'revision_herramientas_screen.dart';
 import 'vista_previa_pdf_screen.dart';
 
 /// Detalle de un checklist de herramientas: quién se las llevó, a qué obra,
-/// qué salió, y — mientras esté pendiente — la confirmación de devolución
-/// con el encargado que las recibe, que lo deja "Conforme".
+/// qué salió, y la acción que toca según el estado — confirmar la salida
+/// (almacén, recién registrado) o confirmar la devolución con el encargado
+/// que las recibe, que lo deja "Conforme".
 class HerramientasDetalleScreen extends StatelessWidget {
   final int id;
 
@@ -51,23 +52,54 @@ class HerramientasDetalleScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmarDevolucion(BuildContext context, ChecklistHerramientas h) async {
-    final resultado = await showModalBottomSheet<(String, String)>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _HojaDevolucion(checklist: h),
+  /// Almacén marca, herramienta por herramienta, qué sale a obra.
+  Future<void> _confirmarSalida(BuildContext context, ChecklistHerramientas h) async {
+    final resultado = await Navigator.of(context).push<ResultadoRevision>(
+      MaterialPageRoute(builder: (_) => RevisionHerramientasScreen(checklist: h, modo: ModoRevision.salida)),
     );
     if (resultado == null || !context.mounted) return;
-    final (encargado, observaciones) = resultado;
-    await context.read<AlmacenState>().confirmarDevolucion(
+    final actualizado = await context.read<AlmacenState>().confirmarSalida(
           h,
-          encargado: encargado,
-          observaciones: observaciones.isEmpty ? null : observaciones,
+          confirmadaPor: resultado.nombre,
+          categorias: resultado.categorias,
+          observaciones: resultado.observaciones,
         );
     if (!context.mounted) return;
+    final faltan = actualizado.noSalieron.length;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${h.numero} conforme: herramientas devueltas.')),
+      SnackBar(
+        content: Text(
+          faltan == 0
+              ? '${h.numero}: salida confirmada, pendiente de devolución.'
+              : '${h.numero}: salida confirmada ($faltan sin salir), pendiente de devolución.',
+        ),
+      ),
+    );
+  }
+
+  /// El encargado marca cada herramienta que volvió; las que no, quedan
+  /// anotadas como faltantes con su motivo.
+  Future<void> _confirmarDevolucion(BuildContext context, ChecklistHerramientas h) async {
+    final resultado = await Navigator.of(context).push<ResultadoRevision>(
+      MaterialPageRoute(builder: (_) => RevisionHerramientasScreen(checklist: h, modo: ModoRevision.devolucion)),
+    );
+    if (resultado == null || !context.mounted) return;
+    final actualizado = await context.read<AlmacenState>().confirmarDevolucion(
+          h,
+          encargado: resultado.nombre,
+          observaciones: resultado.observaciones.isEmpty ? null : resultado.observaciones,
+          categorias: resultado.categorias,
+        );
+    if (!context.mounted) return;
+    final faltan = actualizado.noVolvieron.length;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          faltan == 0
+              ? '${h.numero} conforme: herramientas devueltas.'
+              : '${h.numero} cerrado con ${cantidadConPalabra(faltan, 'herramienta', 'herramientas')} sin devolver.',
+        ),
+      ),
     );
   }
 
@@ -104,6 +136,7 @@ class HerramientasDetalleScreen extends StatelessWidget {
     final observaciones = (h.observaciones ?? '').trim();
     final observacionesDevolucion = (h.observacionesDevolucion ?? '').trim();
     final encargado = (h.encargado ?? '').trim();
+    final salidaConfirmadaPor = (h.salidaConfirmadaPor ?? '').trim();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -137,7 +170,20 @@ class HerramientasDetalleScreen extends StatelessWidget {
                     style: AppTextStyles.subtitulo.copyWith(fontSize: 18, color: BrandColors.azulMarino),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(children: [PildoraEstado.herramientas(h.estado)]),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      PildoraEstado.herramientas(h.estado),
+                      if (h.maleta != null)
+                        PildoraEstado(
+                          texto: h.maleta!,
+                          color: BrandColors.azulMarino,
+                          fondo: const Color(0xFFE2E8F0),
+                          icono: Icons.work_outline_rounded,
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 18),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,7 +191,7 @@ class HerramientasDetalleScreen extends StatelessWidget {
                       Expanded(child: ParDato(etiqueta: 'RESPONSABLE', valor: h.responsable)),
                       Expanded(
                         child: ParDato(
-                          etiqueta: 'FECHA DE SALIDA',
+                          etiqueta: 'REGISTRADO',
                           valor: DateFormat('dd/MM/yyyy').format(h.fechaSalida),
                           alinearDerecha: true,
                         ),
@@ -156,14 +202,25 @@ class HerramientasDetalleScreen extends StatelessWidget {
                   LineaTiempoEstados(
                     pasos: [
                       PasoEstado(
-                        titulo: 'Registrado · pendiente de devolución',
-                        detalle: 'Salida ${_formatoFecha.format(h.fechaSalida)} · ${h.responsable}',
+                        titulo: 'Registrado',
+                        detalle: '${_formatoFecha.format(h.fechaSalida)} · retira ${h.responsable}',
                         hecho: true,
                       ),
                       PasoEstado(
-                        titulo: 'Conforme',
+                        titulo: 'Salida confirmada',
+                        detalle: h.fechaConfirmacionSalida != null
+                            ? '${_formatoFecha.format(h.fechaConfirmacionSalida!)}${salidaConfirmadaPor.isEmpty ? '' : ' · entregó $salidaConfirmadaPor'}'
+                            : h.salidaConfirmada
+                                ? 'Salió a obra'
+                                : 'Cuando almacén confirme que las herramientas salieron',
+                        hecho: h.salidaConfirmada,
+                      ),
+                      PasoEstado(
+                        titulo: h.conforme ? 'Devolución confirmada · Conforme' : 'Pendiente de devolución',
                         detalle: h.fechaDevolucion == null
-                            ? 'Cuando un encargado confirme que volvieron todas'
+                            ? h.salidaConfirmada
+                                ? 'Cuando un encargado confirme que volvieron todas'
+                                : 'Después de la salida, se espera que vuelvan todas'
                             : '${_formatoFecha.format(h.fechaDevolucion!)}${encargado.isEmpty ? '' : ' · recibió $encargado'}',
                         hecho: h.conforme,
                       ),
@@ -179,11 +236,43 @@ class HerramientasDetalleScreen extends StatelessWidget {
                     const TituloSeccion('OBSERVACIONES DE LA DEVOLUCIÓN'),
                     Text(observacionesDevolucion, style: const TextStyle(fontSize: 13.5, height: 1.4)),
                   ],
+                  if (h.noSalieron.isNotEmpty || h.noVolvieron.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: ColoresEstado.urgenteFondo,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (h.noSalieron.isNotEmpty)
+                            Text(
+                              'No salieron (${h.noSalieron.length}): ${h.noSalieron.map((i) => i.texto).join(', ')}',
+                              style: const TextStyle(fontSize: 12.5, color: ColoresEstado.urgente, height: 1.35),
+                            ),
+                          if (h.noSalieron.isNotEmpty && h.noVolvieron.isNotEmpty) const SizedBox(height: 6),
+                          if (h.noVolvieron.isNotEmpty)
+                            Text(
+                              'No volvieron (${h.noVolvieron.length}): ${h.noVolvieron.map((i) => i.texto).join(', ')}',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: ColoresEstado.urgente,
+                                height: 1.35,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   TituloSeccion(
                     'HERRAMIENTAS · ${cantidadConPalabra(h.totalItems, 'ÍTEM', 'ÍTEMS')}',
                   ),
-                  ListaItemsPorCategoria(categorias: h.categorias, completado: h.conforme),
+                  ListaItemsPorCategoria(categorias: h.categorias, completado: h.conforme, recorridoHerramientas: true),
                 ],
               ),
             ),
@@ -193,7 +282,15 @@ class HerramientasDetalleScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: Column(
                   children: [
-                    if (!h.conforme) ...[
+                    if (h.estado == EstadoHerramientas.registrado) ...[
+                      BotonPrincipal(
+                        texto: 'CONFIRMAR SALIDA',
+                        icono: Icons.outbox_outlined,
+                        color: ColoresEstado.pendiente,
+                        onPressed: () => _confirmarSalida(context, h),
+                      ),
+                      const SizedBox(height: 10),
+                    ] else if (!h.conforme) ...[
                       BotonPrincipal(
                         texto: 'CONFIRMAR DEVOLUCIÓN',
                         icono: Icons.assignment_return_outlined,
@@ -230,107 +327,6 @@ class HerramientasDetalleScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// El encargado revisa que volvió todo y lo confirma; devuelve (encargado,
-/// observaciones) o null si se canceló.
-class _HojaDevolucion extends StatefulWidget {
-  final ChecklistHerramientas checklist;
-
-  const _HojaDevolucion({required this.checklist});
-
-  @override
-  State<_HojaDevolucion> createState() => _HojaDevolucionState();
-}
-
-class _HojaDevolucionState extends State<_HojaDevolucion> {
-  final _encargadoController = TextEditingController();
-  final _observacionesController = TextEditingController();
-  bool _revisado = false;
-
-  @override
-  void initState() {
-    super.initState();
-    SharedPreferences.getInstance().then((prefs) {
-      if (mounted && _encargadoController.text.isEmpty) {
-        setState(() => _encargadoController.text = prefs.getString('ultimo_encargado_almacen') ?? '');
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _encargadoController.dispose();
-    _observacionesController.dispose();
-    super.dispose();
-  }
-
-  bool get _listo => _revisado && _encargadoController.text.trim().isNotEmpty;
-
-  Future<void> _confirmar() async {
-    final encargado = _encargadoController.text.trim();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('ultimo_encargado_almacen', encargado);
-    if (mounted) Navigator.of(context).pop((encargado, _observacionesController.text.trim()));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final h = widget.checklist;
-    return HojaAlmacen(
-      titulo: 'Confirmar devolución',
-      texto:
-          'El encargado revisa que volvieron las ${cantidadConPalabra(h.totalItems, 'herramienta', 'herramientas')} de ${h.numero}. Quedará en estado Conforme.',
-      children: [
-        TextField(
-          controller: _encargadoController,
-          textCapitalization: TextCapitalization.words,
-          onChanged: (_) => setState(() {}),
-          decoration: decoracionCampoHoja('Encargado que recibe', icono: Icons.person_outline),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _observacionesController,
-          textCapitalization: TextCapitalization.sentences,
-          minLines: 1,
-          maxLines: 3,
-          decoration: decoracionCampoHoja('Observaciones (opcional)', icono: Icons.notes_outlined),
-        ),
-        CheckboxListTile(
-          value: _revisado,
-          onChanged: (v) => setState(() => _revisado = v ?? false),
-          contentPadding: EdgeInsets.zero,
-          controlAffinity: ListTileControlAffinity.leading,
-          activeColor: BrandColors.cian,
-          title: const Text('Revisé y volvieron todas', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: estiloBotonSecundario,
-                child: const Text('Cancelar'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: FilledButton(
-                onPressed: _listo ? _confirmar : null,
-                style: FilledButton.styleFrom(
-                  backgroundColor: ColoresEstado.listo,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Text('MARCAR CONFORME', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

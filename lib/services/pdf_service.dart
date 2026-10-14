@@ -201,7 +201,9 @@ class PdfService {
         build: (context) => [
           _resumenCantidades('Materiales solicitados', r.totalItems, r.totalUnidades),
           _leyendaCasillas(marcada: 'Entregado', vacia: 'Pendiente de entrega'),
-          for (final cat in r.categorias) ..._seccionCategoriaDocumento(cat, marcado: r.entregado),
+          for (final cat in r.categorias)
+            ..._seccionCategoriaDocumento(cat, marcado: r.entregado, conPrecios: r.conPrecios),
+          if (r.conPrecios) _totalEstimado(r.totalPrecio),
           ..._bloqueObservaciones('Observaciones', r.observaciones),
           pw.SizedBox(height: 30),
           _firmas(
@@ -218,6 +220,19 @@ class PdfService {
                 detalle: r.fechaAprobacion == null ? 'Pendiente de aprobación' : fecha.format(r.fechaAprobacion!),
                 completada: r.fechaAprobacion != null,
                 textoSinNombre: 'Aprobado',
+              ),
+              _Firma(
+                nombre: r.alistadoPor,
+                cargo: 'Alistado por (almacén)',
+                detalle: r.fechaListo != null
+                    ? fecha.format(r.fechaListo!)
+                    : r.entregado
+                        ? 'Alistado'
+                        : r.fechaAprobacion == null
+                            ? 'Pendiente de aprobación'
+                            : 'Pendiente de alistar',
+                completada: r.fechaListo != null || r.entregado,
+                textoSinNombre: 'Listo',
               ),
               _Firma(
                 nombre: r.recibidoPor,
@@ -241,6 +256,7 @@ class PdfService {
   static Future<Uint8List> generarChecklistHerramientas(ChecklistHerramientas h) async {
     final logo = await _cargarLogo();
     final firmaFont = await _cargarFuenteFirma();
+    final fotos = await _cargarFotosItems(h.categorias);
     final fecha = DateFormat('dd/MM/yyyy HH:mm');
 
     final doc = pw.Document();
@@ -254,15 +270,20 @@ class PdfService {
           numero: h.numero,
           datos: [
             ('Obra / proyecto', h.obra),
-            ('Fecha de salida', fecha.format(h.fechaSalida)),
+            if (h.maleta != null) ('Maleta', h.maleta!),
+            ('Fecha de registro', fecha.format(h.fechaSalida)),
+            if (h.fechaConfirmacionSalida != null) ('Salida confirmada', fecha.format(h.fechaConfirmacionSalida!)),
             ('Responsable', h.responsable),
             ('Estado', h.estado.etiqueta),
           ],
         ),
         build: (context) => [
           _resumenCantidades('Herramientas registradas', h.totalItems, h.totalUnidades),
-          _leyendaCasillas(marcada: 'Devuelta', vacia: 'Pendiente de devolución'),
-          for (final cat in h.categorias) ..._seccionCategoriaDocumento(cat, marcado: h.conforme),
+          _leyendaCasillas(marcada: 'Confirmada', vacia: 'Sin confirmar'),
+          for (final cat in h.categorias)
+            ..._seccionCategoriaDocumento(cat, marcado: false, fotos: fotos, salidaEntrada: true),
+          ..._bloqueFaltantes('Herramientas que no salieron', h.noSalieron.map((i) => i.texto)),
+          ..._bloqueFaltantes('Herramientas que no volvieron', h.noVolvieron.map((i) => i.texto)),
           ..._bloqueObservaciones('Observaciones de la salida', h.observaciones),
           ..._bloqueObservaciones('Observaciones de la devolución', h.observacionesDevolucion),
           pw.SizedBox(height: 30),
@@ -273,6 +294,17 @@ class PdfService {
                 cargo: 'Responsable (retira)',
                 detalle: fecha.format(h.fechaSalida),
                 completada: true,
+              ),
+              _Firma(
+                nombre: h.salidaConfirmadaPor,
+                cargo: 'Entregó (almacén)',
+                detalle: h.fechaConfirmacionSalida != null
+                    ? fecha.format(h.fechaConfirmacionSalida!)
+                    : h.salidaConfirmada
+                        ? 'Salida confirmada'
+                        : 'Salida por confirmar',
+                completada: h.salidaConfirmada,
+                textoSinNombre: 'Salió',
               ),
               _Firma(
                 nombre: h.encargado,
@@ -509,7 +541,30 @@ class PdfService {
 
   /// Misma sección por categoría que tenía el checklist de obra: franja
   /// cian con el nombre y filas alternadas con casillero, ítem y cantidad.
-  static List<pw.Widget> _seccionCategoriaDocumento(ChecklistCategoriaState cat, {required bool marcado}) {
+  /// Fotos de las herramientas de una salida por maleta (vienen en los
+  /// assets); si alguna no carga, esa fila queda sin foto.
+  static Future<Map<String, pw.MemoryImage>> _cargarFotosItems(List<ChecklistCategoriaState> categorias) async {
+    final fotos = <String, pw.MemoryImage>{};
+    for (final ruta in categorias.expand((c) => c.items).map((i) => i.imagen).whereType<String>().toSet()) {
+      try {
+        fotos[ruta] = pw.MemoryImage((await rootBundle.load(ruta)).buffer.asUint8List());
+      } catch (_) {
+        // Foto no disponible: se omite.
+      }
+    }
+    return fotos;
+  }
+
+  /// [fotos] solo para salidas por maleta: cada fila lleva la foto de la
+  /// herramienta (o el recuadro vacío si esa no tiene).
+  static List<pw.Widget> _seccionCategoriaDocumento(
+    ChecklistCategoriaState cat, {
+    required bool marcado,
+    Map<String, pw.MemoryImage>? fotos,
+    bool conPrecios = false,
+    bool salidaEntrada = false,
+  }) {
+    final conFotos = fotos != null && fotos.isNotEmpty;
     final cantidad = cat.items.length == 1 ? '1 ítem' : '${cat.items.length} ítems';
     return [
       pw.Container(
@@ -530,6 +585,30 @@ class PdfService {
               ),
             ),
             pw.Text(cantidad, style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+            if (salidaEntrada) ...[
+              pw.SizedBox(
+                width: 52,
+                child: pw.Text('SALIDA',
+                    textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
+              ),
+              pw.SizedBox(
+                width: 52,
+                child: pw.Text('ENTRADA',
+                    textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
+              ),
+            ],
+            if (conPrecios) ...[
+              pw.SizedBox(
+                width: 70,
+                child: pw.Text('P. unit.',
+                    textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+              ),
+              pw.SizedBox(
+                width: 75,
+                child: pw.Text('Subtotal',
+                    textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+              ),
+            ],
           ],
         ),
       ),
@@ -540,8 +619,26 @@ class PdfService {
           padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
           child: pw.Row(
             children: [
-              _casilla(marcado),
-              pw.SizedBox(width: 8),
+              // En salidas de herramientas las casillas van a la derecha (SALIDA / ENTRADA).
+              if (!salidaEntrada) ...[
+                _casilla(marcado),
+                pw.SizedBox(width: 8),
+              ],
+              if (conFotos) ...[
+                pw.Container(
+                  width: 26,
+                  height: 26,
+                  alignment: pw.Alignment.center,
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.white,
+                    border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                  ),
+                  child: fotos[item.imagen] == null
+                      ? null
+                      : pw.Image(fotos[item.imagen]!, width: 24, height: 24, fit: pw.BoxFit.contain),
+                ),
+                pw.SizedBox(width: 8),
+              ],
               pw.Expanded(
                 child: pw.Text(
                   item.esExtra ? '${item.texto} (agregado${item.esProducto ? ' · catálogo' : ''})' : item.texto,
@@ -553,10 +650,85 @@ class PdfService {
                 item.cantidadTexto,
                 style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: BrandColors.pdfCian),
               ),
+              if (salidaEntrada) ...[
+                pw.SizedBox(width: 52, child: pw.Center(child: _casilla(item.salio == true))),
+                pw.SizedBox(width: 52, child: pw.Center(child: _casilla(item.volvio == true))),
+              ],
+              if (conPrecios) ...[
+                pw.SizedBox(
+                  width: 70,
+                  child: pw.Text(
+                    item.precio == null ? 'Sin precio' : _soles(item.precio!),
+                    textAlign: pw.TextAlign.right,
+                    style: const pw.TextStyle(fontSize: 9),
+                  ),
+                ),
+                pw.SizedBox(
+                  width: 75,
+                  child: pw.Text(
+                    item.precio == null ? '-' : _soles(item.subtotal),
+                    textAlign: pw.TextAlign.right,
+                    style: const pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+              ],
             ],
           ),
         );
       }),
+    ];
+  }
+
+  static String _soles(double monto) =>
+      NumberFormat.currency(locale: 'en_US', symbol: 'S/ ').format(monto);
+
+  /// Total del requerimiento (precios por defecto o los que se cambiaron).
+  static pw.Widget _totalEstimado(double total) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(top: 10),
+      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      color: BrandColors.pdfTint(BrandColors.pdfCian, 0.88),
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            child: pw.Text('TOTAL ESTIMADO', style: const pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.Text(
+            _soles(total),
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: BrandColors.pdfAzulMarino),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Lista de herramientas que faltaron (no salieron / no volvieron), para
+  /// que se vea de un vistazo en el documento.
+  static List<pw.Widget> _bloqueFaltantes(String titulo, Iterable<String> nombres) {
+    final lista = nombres.toList();
+    if (lista.isEmpty) return const [];
+    return [
+      pw.SizedBox(height: 12),
+      pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          color: PdfColors.red50,
+          border: pw.Border.all(color: PdfColors.red300),
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              '$titulo (${lista.length})',
+              style: const pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.red800),
+            ),
+            pw.SizedBox(height: 3),
+            pw.Text(lista.join(', '), style: const pw.TextStyle(fontSize: 9)),
+          ],
+        ),
+      ),
     ];
   }
 

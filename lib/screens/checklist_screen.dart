@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../models/checklist_categoria.dart';
+import '../models/datos_almacen.dart';
 import '../state/checklist_state.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
@@ -13,6 +14,7 @@ import '../widgets/animated_pressable.dart';
 import '../widgets/fade_slide_in.dart';
 import '../widgets/porcentaje_animado.dart';
 import 'checklist_resumen_screen.dart';
+import 'datos_almacen_screen.dart';
 
 /// Ruta a una pantalla del recorrido del checklist, entregándole el
 /// borrador con el que trabaja — las rutas empujadas no heredan los
@@ -23,35 +25,57 @@ Route<T> rutaConChecklist<T>(ChecklistState checklist, Widget pantalla) {
   );
 }
 
-/// Abre el checklist de siempre para armar un requerimiento de materiales o
-/// una salida de herramientas. Si ya había uno a medias, pregunta si
-/// continuarlo o empezar de cero (antes se perdía sin preguntar).
+/// Si el borrador ya tiene algo avanzado, pregunta si continuarlo o
+/// empezar de cero. Devuelve true (continuar), false (se reinició para
+/// empezar uno nuevo) o null (se canceló).
+Future<bool?> preguntarContinuarBorrador(BuildContext context, ChecklistState checklist) async {
+  await checklist.cargar();
+  if (!context.mounted || !checklist.tieneProgreso) return false;
+  final continuar = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(
+        checklist.tipo == TipoChecklist.materiales ? 'Tienes un requerimiento a medias' : 'Tienes una salida a medias',
+      ),
+      content: Text(
+        '${checklist.datos == null ? '' : 'Obra: ${checklist.datos!.obra}\n'}'
+        'Ibas en el paso ${checklist.indice + 1} de ${checklist.categorias.length} con '
+        '${checklist.totalMarcados} ítems marcados. ¿Lo continúas o empiezas uno nuevo?',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Empezar nuevo')),
+        TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Continuar')),
+      ],
+    ),
+  );
+  if (continuar == false) await checklist.reiniciar();
+  return continuar;
+}
+
+/// Pide los datos (obra, solicitante/responsable…) antes de empezar: no se
+/// puede hacer nada de Almacén sin ellos. Devuelve false si se volvió atrás.
+Future<bool> pedirDatosChecklist(BuildContext context, ChecklistState checklist) async {
+  final datos = await Navigator.of(context).push<DatosAlmacen>(
+    MaterialPageRoute(builder: (_) => DatosAlmacenScreen(tipo: checklist.tipo, inicial: checklist.datos)),
+  );
+  if (datos == null) return false;
+  checklist.datos = datos;
+  return true;
+}
+
+Future<void> recorrerChecklist(BuildContext context, ChecklistState checklist) =>
+    Navigator.of(context).push(rutaConChecklist<void>(checklist, const ChecklistScreen()));
+
+/// "Nuevo requerimiento": si había uno a medias pregunta si continuarlo;
+/// si no, primero pide los datos y después abre el checklist de siempre.
 Future<void> abrirChecklist(BuildContext context, TipoChecklist tipo) async {
   final checklist = context.read<BorradoresChecklist>().de(tipo);
-  await checklist.cargar();
-  if (!context.mounted) return;
-
-  if (checklist.tieneProgreso) {
-    final continuar = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title:
-            Text(tipo == TipoChecklist.materiales ? 'Tienes un requerimiento a medias' : 'Tienes una salida a medias'),
-        content: Text(
-          'Ibas en el paso ${checklist.indice + 1} de ${checklist.categorias.length} con '
-          '${checklist.totalMarcados} ítems marcados. ¿Lo continúas o empiezas uno nuevo?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Empezar nuevo')),
-          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Continuar')),
-        ],
-      ),
-    );
-    if (continuar == null) return;
-    if (!continuar) await checklist.reiniciar();
+  final continuar = await preguntarContinuarBorrador(context, checklist);
+  if (continuar == null || !context.mounted) return;
+  if (!continuar || checklist.datos == null) {
+    if (!await pedirDatosChecklist(context, checklist) || !context.mounted) return;
   }
-  if (!context.mounted) return;
-  await Navigator.of(context).push(rutaConChecklist<void>(checklist, const ChecklistScreen()));
+  await recorrerChecklist(context, checklist);
 }
 
 /// Recorrido obligatorio categoría por categoría (herramientas y materiales

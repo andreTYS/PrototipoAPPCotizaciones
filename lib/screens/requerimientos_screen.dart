@@ -15,7 +15,7 @@ import 'requerimiento_detalle_screen.dart';
 
 /// Qué requerimientos mostrar: por estado, o solo los urgentes que aún no se
 /// entregan (a lo que lleva la tarjeta "Urgentes" del Inicio).
-enum FiltroRequerimientos { todos, pendiente, aprobado, entregado, urgentes }
+enum FiltroRequerimientos { todos, pendiente, aprobado, listo, entregado, urgentes }
 
 Route<void> rutaRequerimientos({FiltroRequerimientos filtro = FiltroRequerimientos.todos}) {
   return MaterialPageRoute<void>(
@@ -51,6 +51,7 @@ class _RequerimientosScreenState extends State<RequerimientosScreen> {
         FiltroRequerimientos.todos => true,
         FiltroRequerimientos.pendiente => r.estado == EstadoRequerimiento.pendiente,
         FiltroRequerimientos.aprobado => r.estado == EstadoRequerimiento.aprobado,
+        FiltroRequerimientos.listo => r.estado == EstadoRequerimiento.listo,
         FiltroRequerimientos.entregado => r.estado == EstadoRequerimiento.entregado,
         FiltroRequerimientos.urgentes => r.urgente && !r.entregado,
       };
@@ -114,7 +115,8 @@ class _RequerimientosScreenState extends State<RequerimientosScreen> {
                       children: [
                         _pildora(todos, FiltroRequerimientos.todos, 'Todos'),
                         _pildora(todos, FiltroRequerimientos.pendiente, 'Pendiente aprobación'),
-                        _pildora(todos, FiltroRequerimientos.aprobado, 'Aprobado'),
+                        _pildora(todos, FiltroRequerimientos.aprobado, 'Por alistar'),
+                        _pildora(todos, FiltroRequerimientos.listo, 'Listo para entrega'),
                         _pildora(todos, FiltroRequerimientos.entregado, 'Entregado'),
                         _pildora(todos, FiltroRequerimientos.urgentes, 'Urgentes'),
                       ],

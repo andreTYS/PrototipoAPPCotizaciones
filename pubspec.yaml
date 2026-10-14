@@ -30,6 +30,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  sqflite_common_ffi: ^2.3.3
   flutter_launcher_icons: ^0.14.4
 
 flutter_launcher_icons:
@@ -45,10 +46,15 @@ flutter:
   assets:
     - assets/productos_seed.json
     - assets/checklist_seed.json
+    - assets/precios_materiales.json
     - assets/productos/
     - assets/icon/icon.png
     - assets/animations/
     - assets/icons/
+    - assets/maletas/
+    - assets/maletas/maleta1/
+    - assets/maletas/maleta2/
+    - assets/maletas/tld_aml/
   # Empaquetadas localmente (no vía Google Fonts en tiempo de ejecución) para
   # que el texto se vea en la build web/PWA aunque el navegador no pueda
   # llegar a fonts.gstatic.com (red restringida, filtro corporativo, sin

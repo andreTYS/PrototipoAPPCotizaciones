@@ -10,10 +10,10 @@ import '../widgets/encabezado_curvo.dart';
 import '../widgets/estado_vacio.dart';
 import '../widgets/fade_slide_in.dart';
 import 'agregar_item_checklist_screen.dart';
-import 'checklist_screen.dart';
 import 'herramientas_detalle_screen.dart';
+import 'maleta_screen.dart';
 
-enum FiltroHerramientas { todos, pendiente, conforme }
+enum FiltroHerramientas { todos, registrado, pendiente, conforme }
 
 Route<void> rutaHerramientas({FiltroHerramientas filtro = FiltroHerramientas.todos}) {
   return MaterialPageRoute<void>(
@@ -22,8 +22,9 @@ Route<void> rutaHerramientas({FiltroHerramientas filtro = FiltroHerramientas.tod
   );
 }
 
-/// Checklists de herramientas: cada salida a obra queda pendiente de
-/// devolución hasta que un encargado confirma que volvió todo (Conforme).
+/// Checklists de herramientas: cada uno se registra, almacén confirma la
+/// salida a obra, y queda pendiente de devolución hasta que un encargado
+/// confirma que volvió todo (Conforme).
 class HerramientasScreen extends StatefulWidget {
   final FiltroHerramientas filtroInicial;
 
@@ -46,6 +47,7 @@ class _HerramientasScreenState extends State<HerramientasScreen> {
 
   bool _pasaFiltro(ChecklistHerramientas h, FiltroHerramientas filtro) => switch (filtro) {
         FiltroHerramientas.todos => true,
+        FiltroHerramientas.registrado => h.estado == EstadoHerramientas.registrado,
         FiltroHerramientas.pendiente => h.estado == EstadoHerramientas.pendiente,
         FiltroHerramientas.conforme => h.estado == EstadoHerramientas.conforme,
       };
@@ -109,6 +111,7 @@ class _HerramientasScreenState extends State<HerramientasScreen> {
                     child: Row(
                       children: [
                         _pildora(todos, FiltroHerramientas.todos, 'Todos'),
+                        _pildora(todos, FiltroHerramientas.registrado, 'Salida por confirmar'),
                         _pildora(todos, FiltroHerramientas.pendiente, 'Pendiente devolución'),
                         _pildora(todos, FiltroHerramientas.conforme, 'Conforme'),
                       ],
@@ -123,9 +126,9 @@ class _HerramientasScreenState extends State<HerramientasScreen> {
                 child: todos.isEmpty
                     ? const EstadoVacio(
                         icono: Icons.handyman_outlined,
-                        titulo: 'Aún no hay salidas de herramientas',
+                        titulo: 'Aún no hay checklists de herramientas',
                         subtitulo:
-                            'Registra la primera con el checklist de siempre: queda pendiente hasta que se devuelva.',
+                            'Registra el primero con el checklist de siempre; almacén confirma la salida y queda pendiente hasta que se devuelva.',
                       )
                     : lista.isEmpty
                         ? EstadoVacio(
@@ -163,9 +166,9 @@ class _HerramientasScreenState extends State<HerramientasScreen> {
           ],
         ),
         bottomNavigationBar: BotonInferiorFijo(
-          texto: 'REGISTRAR SALIDA',
+          texto: 'NUEVO CHECKLIST',
           icono: Icons.add,
-          onPressed: () => abrirChecklist(context, TipoChecklist.herramientas),
+          onPressed: () => nuevaSalidaHerramientas(context),
         ),
       ),
     );

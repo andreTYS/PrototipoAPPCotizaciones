@@ -15,6 +15,8 @@ CategoriaEstilo estiloDeCategoriaChecklist(String nombre) {
   }
   if (c.contains('TECHO')) return const CategoriaEstilo(Icons.roofing, Color(0xFFB45309));
   if (c.contains('HERRAMIENTA')) return const CategoriaEstilo(Icons.build_outlined, Color(0xFF57534E));
+  // Niveles de una maleta armada (Primer nivel, Segundo nivel...).
+  if (c.contains('NIVEL')) return const CategoriaEstilo(Icons.layers_outlined, Color(0xFF0E7490));
   return const CategoriaEstilo(Icons.checklist, BrandColors.azulMarino);
 }
 
