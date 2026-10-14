@@ -5,7 +5,7 @@ import 'dart:convert';
 /// (nombre, cantidad, precio) en la pantalla de detalle del historial.
 class ItemCotizacionGuardado {
   final String nombre;
-  final double cantidad;
+  final int cantidad;
   final double precioUnitario;
   final String? archivoImagen;
   final String? unidadMedida;
@@ -23,7 +23,7 @@ class ItemCotizacionGuardado {
   factory ItemCotizacionGuardado.fromJson(Map<String, dynamic> json) {
     return ItemCotizacionGuardado(
       nombre: (json['nombre'] ?? '').toString(),
-      cantidad: (json['cantidad'] as num?)?.toDouble() ?? 0,
+      cantidad: (json['cantidad'] as num?)?.toInt() ?? 0,
       precioUnitario: (json['precio_unitario'] as num?)?.toDouble() ?? 0,
       archivoImagen: json['archivo_imagen'] as String?,
       unidadMedida: json['unidad_medida'] as String?,

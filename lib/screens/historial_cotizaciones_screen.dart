@@ -545,8 +545,6 @@ class CotizacionDetalleScreen extends StatelessWidget {
   }
 }
 
-String _cantidadCorta(double n) => n == n.truncateToDouble() ? n.toStringAsFixed(0) : n.toStringAsFixed(2);
-
 class _FilaProductoDetalle extends StatelessWidget {
   final ItemCotizacionGuardado item;
   final NumberFormat moneda;
@@ -556,7 +554,7 @@ class _FilaProductoDetalle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unidad = (item.unidadMedida ?? '').trim();
-    final cantidadTexto = unidad.isEmpty ? _cantidadCorta(item.cantidad) : '${_cantidadCorta(item.cantidad)} $unidad';
+    final cantidadTexto = unidad.isEmpty ? '${item.cantidad}' : '${item.cantidad} $unidad';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
