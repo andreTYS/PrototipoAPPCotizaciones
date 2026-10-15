@@ -68,7 +68,12 @@ services:
       - "traefik.http.routers.icr-cotizador-api.entrypoints=websecure"
       - "traefik.http.routers.icr-cotizador-api.tls=true"
       - "traefik.http.routers.icr-cotizador-api.tls.certresolver=mytlschallenge"
-      - "traefik.http.routers.icr-cotizador-api.priority=100"
+      # Bien alto a propósito: si el router de la app (Host a secas, sin
+      # prioridad explícita) calcula su prioridad automática por longitud de
+      # regla, en algunas versiones de Traefik ese número automático puede
+      # terminar siendo más alto que un 100 puesto a mano — con esto no queda
+      # ambigüedad posible.
+      - "traefik.http.routers.icr-cotizador-api.priority=999999"
       - "traefik.http.routers.icr-cotizador-api.middlewares=icr-cotizador-api-stripprefix"
       - "traefik.http.services.icr-cotizador-api.loadbalancer.server.port=80"
 
