@@ -106,6 +106,12 @@ class ChecklistItemEntry {
   /// Se agregó después de crear el documento (al editarlo con la clave).
   bool agregadoDespues;
 
+  /// Id del ítem en la API compartida (requerimiento_items.id), solo cuando
+  /// el requerimiento se cargó desde ahí — es lo que permite llamar
+  /// alistar_item&item_id=X para este material en particular. Null para
+  /// checklists que todavía viven solo en el almacén local del dispositivo.
+  int? apiItemId;
+
   ChecklistItemEntry({
     required this.texto,
     this.cantidad = 0,
@@ -123,6 +129,7 @@ class ChecklistItemEntry {
     this.alistadoPor,
     this.fechaAlistado,
     this.agregadoDespues = false,
+    this.apiItemId,
   });
 
   bool get marcado => cantidad > 0;
@@ -157,6 +164,7 @@ class ChecklistItemEntry {
       alistadoPor: json['alistado_por'] as String?,
       fechaAlistado: DateTime.tryParse((json['fecha_alistado'] ?? '').toString()),
       agregadoDespues: json['agregado_despues'] == true,
+      apiItemId: (json['api_item_id'] as num?)?.toInt(),
     );
   }
 
@@ -177,6 +185,7 @@ class ChecklistItemEntry {
         if (alistadoPor != null) 'alistado_por': alistadoPor,
         if (fechaAlistado != null) 'fecha_alistado': fechaAlistado!.toIso8601String(),
         if (agregadoDespues) 'agregado_despues': true,
+        if (apiItemId != null) 'api_item_id': apiItemId,
       };
 }
 
