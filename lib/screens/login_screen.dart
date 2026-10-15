@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _apiUrlCtrl,
                           decoration: const InputDecoration(
                             labelText: 'Servidor (una sola vez)',
-                            hintText: 'https://tudominio.com/cotizador-api',
+                            hintText: 'https://cotizador.inversionesicr.com/api',
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.url,

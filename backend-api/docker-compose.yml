@@ -49,18 +49,27 @@ services:
       # en ICR-TIENDA y en el Cotizador web (docker-compose.yml de
       # prototipoappcotizaciones).
       - "traefik.docker.network=n8n_default"
-      # HTTP -> HTTPS redirect
-      - "traefik.http.routers.icr-cotizador-api-http.rule=Host(`${DOMAIN:-cotizador-api.inversionesicr.com}`)"
-      - "traefik.http.routers.icr-cotizador-api-http.entrypoints=web"
-      - "traefik.http.routers.icr-cotizador-api-http.middlewares=icr-cotizador-api-https-redirect"
-      - "traefik.http.middlewares.icr-cotizador-api-https-redirect.redirectscheme.scheme=https"
+      # Mismo dominio que ya usa la app (cotizador.inversionesicr.com), NO un
+      # subdominio nuevo: esto va por /api, como el resto del ecosistero. El
+      # contenedor del build web (prototipoappcotizaciones/docker-compose.yml)
+      # ya tiene un router que matchea Host(cotizador.inversionesicr.com) a
+      # secas — Traefik ordena los routers por longitud/especificidad de la
+      # regla, así que Host+PathPrefix(/api) gana sin tocar ese otro compose,
+      # pero se fija priority explícito para no depender de eso.
+      # El StripPrefix saca el /api antes de pasarle la ruta al PHP, que vive
+      # en la raíz del contenedor (requerimientos.php, no /api/requerimientos.php).
+      - "traefik.http.middlewares.icr-cotizador-api-stripprefix.stripprefix.prefixes=/api"
       # HTTPS — "letsencrypt" no existe como certResolver en el Traefik de
       # este VPS, el único definido es "mytlschallenge" (mismo hallazgo
-      # documentado en ICR-TIENDA y en el Cotizador web).
-      - "traefik.http.routers.icr-cotizador-api.rule=Host(`${DOMAIN:-cotizador-api.inversionesicr.com}`)"
+      # documentado en ICR-TIENDA y en el Cotizador web). El certificado de
+      # cotizador.inversionesicr.com ya existe (lo emitió el router de la app
+      # web) — Traefik lo reusa para este router también, mismo dominio.
+      - "traefik.http.routers.icr-cotizador-api.rule=Host(`${DOMAIN:-cotizador.inversionesicr.com}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.icr-cotizador-api.entrypoints=websecure"
       - "traefik.http.routers.icr-cotizador-api.tls=true"
       - "traefik.http.routers.icr-cotizador-api.tls.certresolver=mytlschallenge"
+      - "traefik.http.routers.icr-cotizador-api.priority=100"
+      - "traefik.http.routers.icr-cotizador-api.middlewares=icr-cotizador-api-stripprefix"
       - "traefik.http.services.icr-cotizador-api.loadbalancer.server.port=80"
 
 volumes:

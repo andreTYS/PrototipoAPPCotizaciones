@@ -38,7 +38,7 @@ cotizaciones con su correlativo (`S00001`), productos (800 cargados,
 búsqueda) y una salida de herramientas completa (registrado → pendiente →
 conforme).
 
-## Los dominios (igual que el resto del ecosistema en tu VPS)
+## Los dominios (ninguno nuevo — va todo bajo el que ya existe)
 
 | Servicio | Dominio |
 |---|---|
@@ -46,12 +46,17 @@ conforme).
 | Tienda | `tienda.inversionesicr.com` |
 | Finanzas | `finanzas.inversionesicr.com` |
 | Cotizador (app Flutter, web) | `cotizador.inversionesicr.com` |
-| **Este backend (nuevo)** | **`cotizador-api.inversionesicr.com`** |
+| **Este backend** | **`cotizador.inversionesicr.com/api`** — mismo dominio, sin DNS nuevo |
 
-`cotizador.inversionesicr.com` ya lo ocupa el build web de la app — por eso
-este backend necesita su **propio** subdominio, no un path dentro del mismo.
-Apunta `cotizador-api.inversionesicr.com` (DNS tipo A) a la IP de tu VPS,
-igual que hiciste con los otros.
+Nada de subdominio aparte: este backend vive bajo `/api` del mismo
+`cotizador.inversionesicr.com` que ya usa la app. El `docker-compose.yml` de
+acá agrega un router de Traefik con `Host(cotizador.inversionesicr.com) &&
+PathPrefix(/api)` — más específico que el router de la app (que solo matchea
+el Host a secas, en el otro `docker-compose.yml` de la raíz del repo) — con
+un `StripPrefix` que le saca el `/api` antes de pasarle la ruta al PHP
+(`/api/login.php` en el navegador llega como `/login.php` al contenedor). El
+certificado de ese dominio ya existe (lo emitió el router de la app web);
+Traefik lo reusa para este router también.
 
 La llamada de este backend al ERP (`login.php`, vía `ERP_API_URL`) es
 servidor-a-servidor por el dominio público de siempre — no hace falta unir
@@ -80,8 +85,16 @@ puro `git pull`, nada de copiar archivos a mano desde tu PC.
    docker cp ../assets/productos icr_cotizador_backend:/var/www/html/uploads/
    docker cp ../assets/maletas   icr_cotizador_backend:/var/www/html/uploads/
    ```
-6. Prueba: `https://cotizador-api.inversionesicr.com/requerimientos.php` con
+6. Prueba: `https://cotizador.inversionesicr.com/api/requerimientos.php` con
    un token válido debería responder `{"status":"ok","data":{"items":[]}}`.
+   Sin token da 401 (así confirmas que el `/api` sí está llegando a este
+   contenedor y no al de la app web).
+
+Si ya desplegaste antes con `cotizador-api.inversionesicr.com` como
+`DOMAIN`: edita el `.env` (no lo toca `git pull`, hay que entrar a mano) con
+`DOMAIN=cotizador.inversionesicr.com` y `docker compose up -d` de nuevo para
+que Traefik vea las labels nuevas. El registro DNS tipo A que hayas creado
+para `cotizador-api` ya no hace falta, puedes borrarlo del hPanel.
 
 ## Del lado de Flutter
 
