@@ -1,0 +1,78 @@
+services:
+  db:
+    image: postgres:16
+    container_name: icr_cotizador_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: icr_cotizador
+      POSTGRES_USER: icr_cotizador
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en el .env antes de desplegar}
+    volumes:
+      - icr_cotizador_data:/var/lib/postgresql/data
+      # Solo corren la PRIMERA vez que el volumen está vacío (initdb) — si ya
+      # desplegaste antes y necesitas re-cargar el esquema, hazlo a mano con
+      # docker compose exec db psql ..., no reiniciando el volumen.
+      - ../base_de_datos/estructura.sql:/docker-entrypoint-initdb.d/1-estructura.sql:ro
+      - ../base_de_datos/datos_iniciales.sql:/docker-entrypoint-initdb.d/2-datos_iniciales.sql:ro
+    networks:
+      - icr_cotizador_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icr_cotizador_backend
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: icr_cotizador
+      PGPASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en el .env antes de desplegar}
+      PGDATABASE: icr_cotizador
+      # El ERP se llama por su dominio público, no por red interna de Docker
+      # (es una llamada servidor-a-servidor, no necesita unirse a la red del
+      # ERP ni tocar su CORS — eso solo aplica a llamadas desde el navegador).
+      ERP_API_URL: ${ERP_API_URL:-https://erp.inversionesicr.com/api}
+    volumes:
+      - icr_cotizador_uploads:/var/www/html/uploads
+    depends_on:
+      - db
+    networks:
+      - icr_cotizador_internal
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      # Debe ser el nombre REAL de la red de Docker (n8n_default), no el
+      # alias "traefik_public" que solo existe dentro de este compose — con
+      # el alias, Traefik no encuentra la red cuando el contenedor tiene más
+      # de una (acá tiene icr_cotizador_internal + esta). Mismo hallazgo que
+      # en ICR-TIENDA y en el Cotizador web (docker-compose.yml de
+      # prototipoappcotizaciones).
+      - "traefik.docker.network=n8n_default"
+      # HTTP -> HTTPS redirect
+      - "traefik.http.routers.icr-cotizador-api-http.rule=Host(`${DOMAIN:-cotizador-api.inversionesicr.com}`)"
+      - "traefik.http.routers.icr-cotizador-api-http.entrypoints=web"
+      - "traefik.http.routers.icr-cotizador-api-http.middlewares=icr-cotizador-api-https-redirect"
+      - "traefik.http.middlewares.icr-cotizador-api-https-redirect.redirectscheme.scheme=https"
+      # HTTPS — "letsencrypt" no existe como certResolver en el Traefik de
+      # este VPS, el único definido es "mytlschallenge" (mismo hallazgo
+      # documentado en ICR-TIENDA y en el Cotizador web).
+      - "traefik.http.routers.icr-cotizador-api.rule=Host(`${DOMAIN:-cotizador-api.inversionesicr.com}`)"
+      - "traefik.http.routers.icr-cotizador-api.entrypoints=websecure"
+      - "traefik.http.routers.icr-cotizador-api.tls=true"
+      - "traefik.http.routers.icr-cotizador-api.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.icr-cotizador-api.loadbalancer.server.port=80"
+
+volumes:
+  icr_cotizador_data:
+  icr_cotizador_uploads:
+
+networks:
+  # Red propia de este stack (Postgres <-> backend) — no se expone a
+  # internet ni se comparte con otros stacks del VPS.
+  icr_cotizador_internal:
+  # Misma red compartida de Traefik que ya usan el ERP, la tienda y el
+  # Cotizador web en este VPS (n8n_default) — no una red nueva.
+  traefik_public:
+    name: n8n_default
+    external: true

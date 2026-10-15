@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# backend-api/: credenciales reales de Postgres/.env, nunca al repo
+backend-api/.env

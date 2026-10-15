@@ -3,7 +3,6 @@
 -- Las rutas de fotos (productos/..., maletas/...) son relativas a la carpeta uploads/ del
 -- servidor: hay que subir allí las carpetas assets/productos y assets/maletas de la app.
 
-SET NAMES utf8mb4;
 
 -- Lista del checklist (materiales con su precio por defecto; herramientas)
 INSERT INTO checklist_catalogo (tipo, categoria, nombre, unidad, precio, orden, base) VALUES

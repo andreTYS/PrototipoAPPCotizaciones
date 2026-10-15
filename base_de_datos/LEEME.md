@@ -1,21 +1,22 @@
 # Base de datos para varios dispositivos
 
-Base **MySQL / MariaDB** (la de Hostinger). Los dispositivos no se conectan a
-la base: hablan con una **API en el servidor** que lee y escribe en estas
+Base **PostgreSQL 16** — mismo motor que ya usa el ERP (icr-almacen-mvp), en
+Docker en el VPS, no MySQL/Hostinger (así empezó este archivo originalmente,
+se migró de ahí). Los dispositivos no se conectan a la base: hablan con la
+API en `backend-api/` (Docker, PHP + PDO pgsql) que lee y escribe en estas
 tablas, así todos ven lo mismo.
 
 | Archivo | Qué es |
 |---|---|
-| `estructura.sql` | Las 15 tablas (acceso, productos, cotizaciones, almacén, listas, maletas, control). |
+| `estructura.sql` | Las 15 tablas (acceso, productos, cotizaciones, almacén, listas, maletas, control), sintaxis Postgres. |
 | `datos_iniciales.sql` | Listas del checklist con precios (99 ítems), 3 maletas (72 herramientas) y los 800 productos. |
 
-## Cómo cargarla
+## Cómo se carga
 
-1. Hostinger → Bases de datos → crear una base MySQL (con su usuario y clave).
-2. phpMyAdmin → entrar a esa base → **Importar** → `estructura.sql`.
-3. Importar `datos_iniciales.sql`.
-4. Subir las fotos al servidor, en la carpeta `uploads/`: `assets/productos/` y
-   `assets/maletas/` de la app (las columnas `imagen` guardan la ruta relativa).
+No a mano: `backend-api/docker-compose.yml` monta estos dos archivos como
+`docker-entrypoint-initdb.d/*` del contenedor `db` (Postgres) — se ejecutan
+solos la primera vez que ese volumen está vacío. Ver `backend-api/LEEME.md`
+para el despliegue completo (dominios, `.env`, `docker compose up`).
 
 ## Tablas
 
