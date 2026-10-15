@@ -68,6 +68,24 @@ class Requerimiento {
   /// Aprobado y todavía sin alistar: el recordatorio para el almacenero.
   bool get pendienteDeAlistar => estado == EstadoRequerimiento.aprobado;
 
+  /// Cuántos materiales ya se alistaron (se van marcando de a poco).
+  int get totalAlistados =>
+      categorias.fold(0, (s, c) => s + c.items.where((i) => i.alistado == true).length);
+
+  bool get todoAlistado => totalItems > 0 && totalAlistados == totalItems;
+
+  /// Quiénes alistaron algo, en el orden en que empezaron.
+  List<String> get quienesAlistaron {
+    final nombres = <String>[];
+    for (final c in categorias) {
+      for (final i in c.items) {
+        final n = (i.alistadoPor ?? '').trim();
+        if (i.alistado == true && n.isNotEmpty && !nombres.contains(n)) nombres.add(n);
+      }
+    }
+    return nombres;
+  }
+
   /// Lo que se muestra en el Inicio: todo lo pendiente de aprobar, y lo
   /// urgente mientras no se haya entregado.
   bool get requiereAtencion => !entregado && (urgente || estado == EstadoRequerimiento.pendiente);
@@ -84,13 +102,17 @@ class Requerimiento {
     // Solo lo usa AlmacenState, para guardar de vuelta el reserva_id/
     // prestamo_id de cada ítem después de sincronizar con el ERP.
     String? categoriasJson,
+    String? obra,
+    String? solicitante,
+    bool? urgente,
+    String? observaciones,
   }) {
     return Requerimiento(
       id: id ?? this.id,
       numero: numero,
-      obra: obra,
-      solicitante: solicitante,
-      urgente: urgente,
+      obra: obra ?? this.obra,
+      solicitante: solicitante ?? this.solicitante,
+      urgente: urgente ?? this.urgente,
       estado: estado ?? this.estado,
       fechaCreacion: fechaCreacion,
       fechaAprobacion: fechaAprobacion ?? this.fechaAprobacion,
@@ -99,7 +121,26 @@ class Requerimiento {
       alistadoPor: alistadoPor ?? this.alistadoPor,
       fechaEntrega: fechaEntrega ?? this.fechaEntrega,
       recibidoPor: recibidoPor ?? this.recibidoPor,
-      observaciones: observaciones,
+      observaciones: observaciones ?? this.observaciones,
+      categoriasJson: categoriasJson ?? this.categoriasJson,
+    );
+  }
+
+  /// Vuelve a "aprobado, pendiente de alistar" (al agregarle algo después
+  /// de que ya estaba listo o entregado): se conserva quién y cuándo lo
+  /// aprobó, y se limpian los pasos que hay que volver a hacer.
+  Requerimiento reabierto({String? categoriasJson, String? obra, String? solicitante, bool? urgente, String? observaciones}) {
+    return Requerimiento(
+      id: id,
+      numero: numero,
+      obra: obra ?? this.obra,
+      solicitante: solicitante ?? this.solicitante,
+      urgente: urgente ?? this.urgente,
+      estado: EstadoRequerimiento.aprobado,
+      fechaCreacion: fechaCreacion,
+      fechaAprobacion: fechaAprobacion,
+      aprobadoPor: aprobadoPor,
+      observaciones: observaciones ?? this.observaciones,
       categoriasJson: categoriasJson ?? this.categoriasJson,
     );
   }

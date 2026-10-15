@@ -99,12 +99,14 @@ class ChecklistHerramientas {
     // prestamo_id de cada ítem después de sincronizar con el ERP.
     String? categoriasJson,
     String? observaciones,
+    String? obra,
+    String? responsable,
   }) {
     return ChecklistHerramientas(
       id: id ?? this.id,
       numero: numero,
-      obra: obra,
-      responsable: responsable,
+      obra: obra ?? this.obra,
+      responsable: responsable ?? this.responsable,
       maleta: maleta,
       estado: estado ?? this.estado,
       fechaSalida: fechaSalida,
@@ -114,6 +116,25 @@ class ChecklistHerramientas {
       encargado: encargado ?? this.encargado,
       observaciones: observaciones ?? this.observaciones,
       observacionesDevolucion: observacionesDevolucion ?? this.observacionesDevolucion,
+      categoriasJson: categoriasJson ?? this.categoriasJson,
+    );
+  }
+
+  /// Vuelve a "pendiente de devolución" (al agregarle una herramienta
+  /// después de que ya estaba conforme): se conserva la salida y se limpia
+  /// la devolución, que hay que volver a confirmar.
+  ChecklistHerramientas reabierto({String? categoriasJson, String? obra, String? responsable, String? observaciones}) {
+    return ChecklistHerramientas(
+      id: id,
+      numero: numero,
+      obra: obra ?? this.obra,
+      responsable: responsable ?? this.responsable,
+      maleta: maleta,
+      estado: EstadoHerramientas.pendiente,
+      fechaSalida: fechaSalida,
+      fechaConfirmacionSalida: fechaConfirmacionSalida,
+      salidaConfirmadaPor: salidaConfirmadaPor,
+      observaciones: observaciones ?? this.observaciones,
       categoriasJson: categoriasJson ?? this.categoriasJson,
     );
   }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/checklist_categoria.dart';
 import '../models/requerimiento.dart';
 import '../services/notificaciones_service.dart';
 import '../services/pdf_service.dart';
@@ -11,9 +12,12 @@ import '../state/almacen_state.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
 import '../utils/formato.dart';
+import '../utils/seguridad.dart';
 import '../utils/texto_compartir.dart';
 import '../widgets/almacen_widgets.dart';
 import '../widgets/encabezado_curvo.dart';
+import 'alistar_requerimiento_screen.dart';
+import 'editar_almacen_screen.dart';
 import 'vista_previa_pdf_screen.dart';
 
 /// Detalle de un requerimiento: datos, recorrido de estados, lo pedido por
@@ -73,29 +77,68 @@ class RequerimientoDetalleScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _marcarListo(BuildContext context, Requerimiento r) async {
-    final alistadoPor = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => HojaConfirmacionNombre(
-        titulo: '¿Está listo para entrega?',
-        texto:
-            'Confirma que ya se alistaron los materiales de ${r.numero} (${cantidadConPalabra(r.totalItems, 'ítem', 'ítems')}). Pasará a estado Listo para entrega.',
-        etiquetaNombre: 'Alistado por (almacenero)',
-        textoBoton: 'SÍ, ESTÁ LISTO',
-        color: ColoresEstado.preparado,
-        clavePreferencia: 'ultimo_almacenero',
-      ),
+  /// Alistar material por material: se marca lo que ya se preparó y se
+  /// guarda el avance; otra persona puede continuar donde se quedó. Al
+  /// marcar todo, pasa solo a "listo para entrega".
+  Future<void> _alistar(BuildContext context, Requerimiento r) async {
+    final resultado = await Navigator.of(context).push<ResultadoAlistado>(
+      MaterialPageRoute(builder: (_) => AlistarRequerimientoScreen(requerimiento: r)),
     );
-    if (alistadoPor == null || !context.mounted) return;
-    await context.read<AlmacenState>().marcarListoParaEntrega(
-          r,
-          alistadoPor: alistadoPor.isEmpty ? null : alistadoPor,
-        );
+    if (resultado == null || !context.mounted) return;
+    final actualizado = await context.read<AlmacenState>().guardarAlistado(r, categorias: resultado.categorias);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${r.numero} listo para entrega.')),
+      SnackBar(
+        content: Text(
+          actualizado.estado == EstadoRequerimiento.listo
+              ? '${r.numero} listo para entrega.'
+              : '${r.numero}: avance guardado (${actualizado.totalAlistados} de ${actualizado.totalItems} alistados).',
+        ),
+      ),
+    );
+  }
+
+  /// Editar (con la clave): cambiar datos, agregar lo que se olvidó o se
+  /// pidió a último momento, cambiar cantidades y precios.
+  Future<void> _editar(BuildContext context, Requerimiento r) async {
+    if (!await pedirClaveEdicion(context) || !context.mounted) return;
+    final resultado = await Navigator.of(context).push<ResultadoEdicion>(
+      MaterialPageRoute(
+        builder: (_) => EditarAlmacenScreen(
+          tipo: TipoChecklist.materiales,
+          numero: r.numero,
+          obra: r.obra,
+          persona: r.solicitante,
+          observaciones: r.observaciones ?? '',
+          urgente: r.urgente,
+          categorias: categoriasDesdeJson(r.categoriasJson),
+        ),
+      ),
+    );
+    if (resultado == null || !context.mounted) return;
+    final reabre = resultado.nuevos > 0 &&
+        (r.estado == EstadoRequerimiento.listo || r.estado == EstadoRequerimiento.entregado);
+    if (reabre) {
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Se agregaron materiales'),
+          content: Text(
+            '${r.numero} está ${r.estado == EstadoRequerimiento.entregado ? 'entregado' : 'listo para entrega'}. '
+            'Al guardar volverá a "Aprobado · pendiente de alistar" para que se alisten los nuevos.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Guardar')),
+          ],
+        ),
+      );
+      if (confirmar != true || !context.mounted) return;
+    }
+    await context.read<AlmacenState>().editarRequerimiento(r, resultado);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(resultado.resumen.isEmpty ? 'Sin cambios.' : '${r.numero} actualizado.')),
     );
   }
 
@@ -165,7 +208,9 @@ class RequerimientoDetalleScreen extends StatelessWidget {
             ? 'Materiales alistados por almacén'
             : r.fechaAprobacion == null
                 ? 'Después de la aprobación, almacén prepara los materiales'
-                : 'Almacén debe preparar los materiales',
+                : r.totalAlistados > 0
+                    ? 'Alistados ${r.totalAlistados} de ${r.totalItems}${r.quienesAlistaron.isEmpty ? '' : ' · ${r.quienesAlistaron.join(', ')}'}'
+                    : 'Almacén debe preparar los materiales',
         hecho: alistado,
       ),
       PasoEstado(
@@ -210,6 +255,11 @@ class RequerimientoDetalleScreen extends StatelessWidget {
               conVolver: true,
               acciones: [
                 IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                  tooltip: 'Editar',
+                  onPressed: () => _editar(context, r),
+                ),
+                IconButton(
                   icon: const Icon(Icons.copy_outlined, color: Colors.white),
                   tooltip: 'Copiar como mensaje',
                   onPressed: () => _copiar(context, r),
@@ -235,7 +285,10 @@ class RequerimientoDetalleScreen extends StatelessWidget {
                     runSpacing: 6,
                     children: [
                       PildoraEstado.requerimiento(r.estado),
-                      if (r.pendienteDeAlistar) PildoraEstado.porAlistar(),
+                      if (r.pendienteDeAlistar)
+                        PildoraEstado.porAlistar(
+                          r.totalAlistados == 0 ? 'Pendiente de alistar' : 'Alistando ${r.totalAlistados}/${r.totalItems}',
+                        ),
                       if (r.urgente && !r.entregado) PildoraEstado.urgente(),
                     ],
                   ),
@@ -264,7 +317,11 @@ class RequerimientoDetalleScreen extends StatelessWidget {
                   TituloSeccion(
                     'MATERIALES SOLICITADOS · ${cantidadConPalabra(r.totalItems, 'ÍTEM', 'ÍTEMS')}',
                   ),
-                  ListaItemsPorCategoria(categorias: r.categorias, completado: r.entregado),
+                  ListaItemsPorCategoria(
+                    categorias: r.categorias,
+                    completado: r.entregado,
+                    mostrarAlistado: r.estado != EstadoRequerimiento.pendiente,
+                  ),
                   if (r.conPrecios)
                     Container(
                       margin: const EdgeInsets.only(top: 2),
@@ -306,10 +363,12 @@ class RequerimientoDetalleScreen extends StatelessWidget {
                       )
                     else if (r.estado == EstadoRequerimiento.aprobado)
                       BotonPrincipal(
-                        texto: 'LISTO PARA ENTREGA',
+                        texto: r.totalAlistados == 0
+                            ? 'ALISTAR MATERIALES'
+                            : 'CONTINUAR ALISTANDO · ${r.totalAlistados} DE ${r.totalItems}',
                         icono: Icons.inventory_2_outlined,
                         color: ColoresEstado.preparado,
-                        onPressed: () => _marcarListo(context, r),
+                        onPressed: () => _alistar(context, r),
                       )
                     else if (r.estado == EstadoRequerimiento.listo)
                       BotonPrincipal(

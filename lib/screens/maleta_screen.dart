@@ -271,7 +271,7 @@ class _MaletaResumenScreenState extends State<MaletaResumenScreen> {
       MaterialPageRoute<void>(
         builder: (_) => LottieGateScreen(
           lottieAsset: 'assets/animations/verification.lottie',
-          mensaje: 'Registrando la salida...',
+          mensaje: 'Registrando...',
           proceso: () async {
             final salida = await almacen.registrarSalida(
               obra: obra,

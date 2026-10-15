@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/checklist_categoria.dart';
 import '../models/checklist_herramientas.dart';
+import '../models/item_catalogo_checklist.dart';
 import '../models/requerimiento.dart';
+import '../screens/editar_almacen_screen.dart';
 import '../services/api_service.dart';
 import '../services/db_helper.dart';
 import '../services/erp_config_service.dart';
@@ -148,6 +150,99 @@ class AlmacenState extends ChangeNotifier {
         categoriasJson: categoriasAJson(categorias),
       ),
     );
+  }
+
+  /// Guarda el avance del alistado (los materiales marcados en [categorias],
+  /// cada uno con quién y cuándo). Si ya están todos alistados, el
+  /// requerimiento pasa solo a "listo para entrega"; si no, sigue pendiente
+  /// de alistar para que otra persona continúe.
+  Future<Requerimiento> guardarAlistado(Requerimiento r, {required List<ChecklistCategoriaState> categorias}) {
+    final items = categorias.expand((c) => c.items).toList();
+    final todo = items.isNotEmpty && items.every((i) => i.alistado == true);
+    final quienes = <String>[];
+    for (final i in items) {
+      final n = (i.alistadoPor ?? '').trim();
+      if (i.alistado == true && n.isNotEmpty && !quienes.contains(n)) quienes.add(n);
+    }
+    final conAvance = r.copyWith(categoriasJson: categoriasAJson(categorias));
+    return _actualizarRequerimiento(
+      todo
+          ? conAvance.copyWith(
+              estado: EstadoRequerimiento.listo,
+              fechaListo: DateTime.now(),
+              alistadoPor: quienes.join(', '),
+            )
+          : conAvance,
+    );
+  }
+
+  /// Anota en las observaciones qué se cambió y cuándo, para que quede el
+  /// rastro de las ediciones.
+  static String? _conBitacora(String observaciones, List<String> resumen) {
+    final base = observaciones.trim();
+    if (resumen.isEmpty) return base.isEmpty ? null : base;
+    final ahora = DateTime.now();
+    final fecha =
+        '${ahora.day.toString().padLeft(2, '0')}/${ahora.month.toString().padLeft(2, '0')} ${ahora.hour.toString().padLeft(2, '0')}:${ahora.minute.toString().padLeft(2, '0')}';
+    final linea = '[Editado $fecha] ${resumen.join('; ')}';
+    return base.isEmpty ? linea : '$base\n$linea';
+  }
+
+  /// Lo agregado con "Guardar también en la lista" pasa a la lista base.
+  static Future<void> _guardarEnListas(List<ItemCatalogoChecklist> items) async {
+    for (final item in items) {
+      final existentes = await DbHelper.instance.getItemsCatalogoChecklist(item.tipo);
+      final yaEsta = existentes.any((e) => e.nombre.toLowerCase() == item.nombre.toLowerCase());
+      if (!yaEsta) await DbHelper.instance.agregarItemCatalogoChecklist(item);
+    }
+  }
+
+  /// Edita un requerimiento ya registrado (datos, ítems, cantidades,
+  /// precios). Si se le agregó algo cuando ya estaba listo o entregado,
+  /// vuelve a "aprobado, pendiente de alistar" para alistar lo nuevo.
+  Future<Requerimiento> editarRequerimiento(Requerimiento r, ResultadoEdicion e) async {
+    await _guardarEnListas(e.paraLaLista);
+    final json = categoriasAJson(e.categorias);
+    final observaciones = _conBitacora(e.observaciones, e.resumen);
+    final reabre = e.nuevos > 0 &&
+        (r.estado == EstadoRequerimiento.listo || r.estado == EstadoRequerimiento.entregado);
+    var nuevo = reabre
+        ? r.reabierto(
+            categoriasJson: json, obra: e.obra, solicitante: e.persona, urgente: e.urgente, observaciones: observaciones)
+        : r.copyWith(
+            categoriasJson: json, obra: e.obra, solicitante: e.persona, urgente: e.urgente, observaciones: observaciones);
+    // Si quedó aprobado y ya todo está alistado (por ejemplo, se quitó lo
+    // único que faltaba), pasa a listo.
+    if (nuevo.estado == EstadoRequerimiento.aprobado && nuevo.todoAlistado) {
+      nuevo = nuevo.copyWith(
+        estado: EstadoRequerimiento.listo,
+        fechaListo: DateTime.now(),
+        alistadoPor: nuevo.quienesAlistaron.join(', '),
+      );
+    }
+    return _actualizarRequerimiento(nuevo);
+  }
+
+  /// Edita una salida de herramientas ya registrada. Las herramientas
+  /// agregadas cuando la salida ya se confirmó se dan por salidas; si estaba
+  /// conforme, vuelve a "pendiente de devolución".
+  Future<ChecklistHerramientas> editarHerramientas(ChecklistHerramientas h, ResultadoEdicion e) async {
+    await _guardarEnListas(e.paraLaLista);
+    final yaSalio = h.estado != EstadoHerramientas.registrado;
+    if (yaSalio) {
+      for (final c in e.categorias) {
+        for (final i in c.items) {
+          if (i.agregadoDespues && i.salio == null) i.salio = true;
+        }
+      }
+    }
+    final json = categoriasAJson(e.categorias);
+    final observaciones = _conBitacora(e.observaciones, e.resumen);
+    final reabre = e.nuevos > 0 && h.estado == EstadoHerramientas.conforme;
+    final nuevo = reabre
+        ? h.reabierto(categoriasJson: json, obra: e.obra, responsable: e.persona, observaciones: observaciones)
+        : h.copyWith(categoriasJson: json, obra: e.obra, responsable: e.persona, observaciones: observaciones);
+    return _actualizarHerramientas(nuevo);
   }
 
   /// El almacenero terminó de preparar los materiales.

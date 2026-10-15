@@ -62,8 +62,8 @@ class PildoraEstado extends StatelessWidget {
 
   /// Recordatorio para el almacenero mientras un requerimiento aprobado no
   /// se ha alistado.
-  factory PildoraEstado.porAlistar() => const PildoraEstado(
-        texto: 'Pendiente de alistar',
+  factory PildoraEstado.porAlistar([String texto = 'Pendiente de alistar']) => PildoraEstado(
+        texto: texto,
         color: ColoresEstado.pendiente,
         fondo: ColoresEstado.pendienteFondo,
         icono: Icons.inventory_2_outlined,
@@ -198,7 +198,10 @@ class TarjetaRequerimiento extends StatelessWidget {
           '${r.numero} · ${cantidadConPalabra(r.totalItems, 'ítem', 'ítems')}${r.conPrecios ? ' · ${soles(r.totalPrecio)}' : ''} · ${fechaCorta(r.fechaCreacion)} · ${r.solicitante}',
       pildoras: [
         PildoraEstado.requerimiento(r.estado),
-        if (r.pendienteDeAlistar) PildoraEstado.porAlistar(),
+        if (r.pendienteDeAlistar)
+          PildoraEstado.porAlistar(
+            r.totalAlistados == 0 ? 'Pendiente de alistar' : 'Alistando ${r.totalAlistados}/${r.totalItems}',
+          ),
         if (urgenteActivo) PildoraEstado.urgente(),
       ],
       onTap: onTap,
@@ -345,11 +348,16 @@ class ListaItemsPorCategoria extends StatelessWidget {
   /// en obra, devuelta, no volvió) según lo que se marcó al confirmar.
   final bool recorridoHerramientas;
 
+  /// Requerimientos aprobados: cada material muestra si ya se alistó, quién
+  /// lo hizo y cuándo.
+  final bool mostrarAlistado;
+
   const ListaItemsPorCategoria({
     super.key,
     required this.categorias,
     this.completado = false,
     this.recorridoHerramientas = false,
+    this.mostrarAlistado = false,
   });
 
   @override
@@ -407,9 +415,13 @@ class ListaItemsPorCategoria extends StatelessWidget {
                           _IconoRecorrido(item: item)
                         else
                           Icon(
-                            completado ? Icons.check_circle : Icons.radio_button_unchecked,
+                            completado || (mostrarAlistado && item.alistado == true)
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
                             size: 18,
-                            color: completado ? BrandColors.cian : colorScheme.outline,
+                            color: completado || (mostrarAlistado && item.alistado == true)
+                                ? (mostrarAlistado && !completado ? ColoresEstado.preparado : BrandColors.cian)
+                                : colorScheme.outline,
                           ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -417,6 +429,14 @@ class ListaItemsPorCategoria extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(item.texto, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
+                              if (mostrarAlistado && item.alistado == true)
+                                Text(
+                                  'Alistado${(item.alistadoPor ?? '').isEmpty ? '' : ' por ${item.alistadoPor}'}'
+                                  '${item.fechaAlistado == null ? '' : ' · ${fechaCortaConHora(item.fechaAlistado!)}'}',
+                                  style: AppTextStyles.apoyo,
+                                ),
+                              if (item.agregadoDespues)
+                                const Text('Agregado después', style: AppTextStyles.apoyo),
                               if (conPrecios)
                                 Text(
                                   item.precio == null

@@ -96,6 +96,16 @@ class ChecklistItemEntry {
   bool? salio;
   bool? volvio;
 
+  /// Requerimientos: si ya se alistó (se preparó en almacén), quién lo
+  /// marcó y cuándo. Se va marcando de a poco: una persona alista unos y
+  /// otra continúa con los que faltan.
+  bool? alistado;
+  String? alistadoPor;
+  DateTime? fechaAlistado;
+
+  /// Se agregó después de crear el documento (al editarlo con la clave).
+  bool agregadoDespues;
+
   ChecklistItemEntry({
     required this.texto,
     this.cantidad = 0,
@@ -109,6 +119,10 @@ class ChecklistItemEntry {
     this.precio,
     this.salio,
     this.volvio,
+    this.alistado,
+    this.alistadoPor,
+    this.fechaAlistado,
+    this.agregadoDespues = false,
   });
 
   bool get marcado => cantidad > 0;
@@ -139,6 +153,10 @@ class ChecklistItemEntry {
       precio: (json['precio'] as num?)?.toDouble(),
       salio: json['salio'] as bool?,
       volvio: json['volvio'] as bool?,
+      alistado: json['alistado'] as bool?,
+      alistadoPor: json['alistado_por'] as String?,
+      fechaAlistado: DateTime.tryParse((json['fecha_alistado'] ?? '').toString()),
+      agregadoDespues: json['agregado_despues'] == true,
     );
   }
 
@@ -155,6 +173,10 @@ class ChecklistItemEntry {
         if (precio != null) 'precio': precio,
         if (salio != null) 'salio': salio,
         if (volvio != null) 'volvio': volvio,
+        if (alistado != null) 'alistado': alistado,
+        if (alistadoPor != null) 'alistado_por': alistadoPor,
+        if (fechaAlistado != null) 'fecha_alistado': fechaAlistado!.toIso8601String(),
+        if (agregadoDespues) 'agregado_despues': true,
       };
 }
 

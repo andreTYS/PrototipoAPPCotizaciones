@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../theme/app_text_styles.dart';
@@ -168,4 +169,35 @@ Future<void> borrarFotoGuardada(String? ruta) async {
   } catch (_) {
     // Si ya no estaba, no pasa nada.
   }
+}
+
+/// Pide un número (precio, cantidad) en un cuadro de diálogo. Devuelve el
+/// valor, o null si se canceló o no era un número.
+Future<double?> pedirNumero(
+  BuildContext context, {
+  required String titulo,
+  required String etiqueta,
+  double? valorInicial,
+  String prefijo = '',
+}) async {
+  final controller = TextEditingController(text: valorInicial?.toStringAsFixed(2) ?? '');
+  final texto = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(titulo),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+        decoration: InputDecoration(prefixText: prefijo, labelText: etiqueta),
+        onSubmitted: (v) => Navigator.pop(dialogContext, v),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
+        FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text), child: const Text('Guardar')),
+      ],
+    ),
+  );
+  return double.tryParse((texto ?? '').trim().replaceAll(',', '.'));
 }

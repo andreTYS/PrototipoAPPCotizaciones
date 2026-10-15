@@ -10,6 +10,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/checklist_categoria.dart';
 import '../models/checklist_herramientas.dart';
+import '../models/cotizacion_guardada.dart';
 import '../models/producto.dart';
 import '../models/requerimiento.dart';
 import '../state/cotizacion_state.dart';
@@ -60,6 +61,7 @@ class PdfService {
     String moneda = '',
     String nroCuenta = '',
     String cci = '',
+    DateTime? fecha,
   }) async {
     final imagenes = await _cargarImagenes(items);
     final logo = pw.MemoryImage(
@@ -69,7 +71,7 @@ class PdfService {
     // locale 'en_US' solo para el agrupado de miles/decimales (1,234.56);
     // el símbolo "S/ " es el de la cotización real de Inversiones ICR.
     final formatoMoneda = NumberFormat.currency(locale: 'en_US', symbol: 'S/ ');
-    final fecha = DateFormat('dd/MM/yyyy').format(DateTime.now());
+    final fechaTexto = DateFormat('dd/MM/yyyy').format(fecha ?? DateTime.now());
 
     final totalBruto = items.fold<double>(0, (s, i) => s + i.subtotal);
     final subtotalNeto = totalBruto / (1 + _igv);
@@ -86,7 +88,7 @@ class PdfService {
           rucDni: rucDni,
           telefono: telefono,
           vendedor: vendedor,
-          fecha: fecha,
+          fecha: fechaTexto,
           numero: numero,
           totalBruto: totalBruto,
           moneda: formatoMoneda,
@@ -122,6 +124,43 @@ class PdfService {
   // un path real sin tener que tocar el esquema de la tabla
   // cotizaciones_guardadas (columna archivo_pdf, ya en uso en el celular).
   static const _prefijoB64 = 'b64:';
+
+  /// Vuelve a armar el PDF de una cotización ya guardada con sus datos
+  /// actuales (después de editarla) y reemplaza el archivo del historial.
+  /// Conserva el número y la fecha originales. Devuelve la ruta del archivo.
+  static Future<String> regenerarCotizacion(CotizacionGuardada c) async {
+    final numero = int.tryParse(c.numero.replaceAll(RegExp(r'\D'), '')) ?? 0;
+    final bytes = await generar(
+      numero: numero,
+      fecha: c.fecha,
+      items: [
+        for (final i in c.items)
+          ItemCotizacion(
+            producto: Producto(
+              nombre: i.nombre,
+              precioVenta: i.precioUnitario,
+              unidadMedida: i.unidadMedida,
+              archivoImagen: i.archivoImagen,
+              categoriaProducto: '',
+            ),
+            cantidad: i.cantidad,
+          ),
+      ],
+      cliente: c.cliente,
+      rucDni: c.rucDni ?? '',
+      telefono: c.telefono ?? '',
+      vendedor: c.vendedor ?? '',
+      banco: c.banco ?? '',
+      moneda: c.moneda ?? '',
+      nroCuenta: c.nroCuenta ?? '',
+      cci: c.cci ?? '',
+    );
+    if (c.archivoPdf.isNotEmpty) {
+      await File(c.archivoPdf).writeAsBytes(bytes);
+      return c.archivoPdf;
+    }
+    return guardarEnDisco(bytes, numero);
+  }
 
   /// Guarda el PDF ya generado para poder volver a abrirlo/compartirlo
   /// después desde el Historial. En Android/iOS queda en un archivo real

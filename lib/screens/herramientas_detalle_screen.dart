@@ -3,15 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
+import '../models/checklist_categoria.dart';
 import '../models/checklist_herramientas.dart';
 import '../services/pdf_service.dart';
 import '../state/almacen_state.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
 import '../utils/formato.dart';
+import '../utils/seguridad.dart';
 import '../utils/texto_compartir.dart';
 import '../widgets/almacen_widgets.dart';
 import '../widgets/encabezado_curvo.dart';
+import 'editar_almacen_screen.dart';
 import 'revision_herramientas_screen.dart';
 import 'vista_previa_pdf_screen.dart';
 
@@ -103,6 +106,49 @@ class HerramientasDetalleScreen extends StatelessWidget {
     );
   }
 
+  /// Editar (con la clave): cambiar datos, agregar una herramienta que se
+  /// olvidó, cambiar cantidades o quitar alguna.
+  Future<void> _editar(BuildContext context, ChecklistHerramientas h) async {
+    if (!await pedirClaveEdicion(context) || !context.mounted) return;
+    final resultado = await Navigator.of(context).push<ResultadoEdicion>(
+      MaterialPageRoute(
+        builder: (_) => EditarAlmacenScreen(
+          tipo: TipoChecklist.herramientas,
+          numero: h.numero,
+          obra: h.obra,
+          persona: h.responsable,
+          observaciones: h.observaciones ?? '',
+          urgente: false,
+          categorias: [
+            for (final c in h.categorias) ChecklistCategoriaState(nombre: c.nombre, items: [...c.items]),
+          ],
+        ),
+      ),
+    );
+    if (resultado == null || !context.mounted) return;
+    if (resultado.nuevos > 0 && h.estado == EstadoHerramientas.conforme) {
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Se agregaron herramientas'),
+          content: Text(
+            '${h.numero} está conforme. Al guardar volverá a "Pendiente de devolución" para confirmar la devolución otra vez.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Guardar')),
+          ],
+        ),
+      );
+      if (confirmar != true || !context.mounted) return;
+    }
+    await context.read<AlmacenState>().editarHerramientas(h, resultado);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(resultado.resumen.isEmpty ? 'Sin cambios.' : '${h.numero} actualizado.')),
+    );
+  }
+
   Future<void> _eliminar(BuildContext context, ChecklistHerramientas h) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -149,6 +195,11 @@ class HerramientasDetalleScreen extends StatelessWidget {
               color: BrandColors.cian,
               conVolver: true,
               acciones: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                  tooltip: 'Editar',
+                  onPressed: () => _editar(context, h),
+                ),
                 IconButton(
                   icon: const Icon(Icons.copy_outlined, color: Colors.white),
                   tooltip: 'Copiar como mensaje',

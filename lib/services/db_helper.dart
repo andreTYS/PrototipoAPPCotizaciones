@@ -575,6 +575,12 @@ class DbHelper {
     return result.map((e) => CotizacionGuardada.fromMap(e)).toList();
   }
 
+  /// Guarda los cambios de una cotización editada (datos, productos, total).
+  Future<void> actualizarCotizacion(CotizacionGuardada cotizacion) async {
+    final db = await database;
+    await db.update('cotizaciones_guardadas', cotizacion.toMap(), where: 'id = ?', whereArgs: [cotizacion.id]);
+  }
+
   Future<void> eliminarCotizacion(int id) async {
     final db = await database;
     await db.delete('cotizaciones_guardadas', where: 'id = ?', whereArgs: [id]);
