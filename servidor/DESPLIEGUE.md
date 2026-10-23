@@ -49,6 +49,19 @@ No hay forma de crear cuentas "a mano" desde esta API (se quitó
 `crearUsuario`/`actualizarUsuario`, que eran de la versión con clave
 propia): todas las cuentas vienen del ERP.
 
+## La app (web y APK)
+
+La build web (ya desplegada) usa la API bajo su propio dominio
+automáticamente (`/api`, mismo origen) — no necesita configuración. Para
+un APK que hable con este servidor compartido (en vez de guardar todo
+solo en el celular), hay que compilarlo con la URL de la API:
+
+```bash
+flutter build apk --dart-define=API_URL=https://cotizador.inversionesicr.com/api
+```
+
+Sin ese `--dart-define`, el APK queda en modo local (ver `lib/services/modo.dart`).
+
 ## Respaldos
 
 `scripts/respaldo.sh` hace un `pg_dump` de la base; `scripts/restaurar.sh`
