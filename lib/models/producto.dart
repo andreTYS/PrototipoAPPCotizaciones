@@ -73,4 +73,10 @@ class Producto {
 
 /// Las fotos del catálogo son nombres de archivo dentro de los assets; las
 /// que se toman desde el celular se guardan con su ruta absoluta.
-bool esRutaDeArchivo(String? archivo) => archivo != null && archivo.startsWith('/');
+bool esRutaDeArchivo(String? archivo) =>
+    archivo != null && archivo.startsWith('/') && !archivo.startsWith('/uploads/');
+
+/// Las fotos que se suben con el servidor compartido ("/uploads/….jpg") se
+/// piden por internet, no están en el celular.
+bool esFotoDeServidor(String? archivo) =>
+    archivo != null && (archivo.startsWith('/uploads/') || archivo.startsWith('http://') || archivo.startsWith('https://'));

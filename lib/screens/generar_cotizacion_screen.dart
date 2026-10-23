@@ -181,7 +181,9 @@ class _GenerarCotizacionScreenState extends State<GenerarCotizacionScreen> {
       cci: cci,
     );
 
-    final rutaArchivo = await PdfService.guardarEnDisco(bytes, numero);
+    // Con servidor no se guarda el archivo: el PDF se arma de nuevo desde los
+    // datos cada vez que se abre, y así lo ven todos los usuarios.
+    final rutaArchivo = DbHelper.instance.esServidor ? '' : await PdfService.guardarEnDisco(bytes, numero);
     await DbHelper.instance.guardarCotizacion(
       CotizacionGuardada(
         numero: PdfService.formatearNumero(numero),

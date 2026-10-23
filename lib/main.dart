@@ -1,30 +1,33 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import 'screens/login_screen.dart';
+import 'services/api_cliente.dart';
 import 'services/db_helper.dart';
 import 'services/notificaciones_service.dart';
 import 'state/almacen_state.dart';
+import 'state/auth_state.dart';
 import 'state/checklist_state.dart';
 import 'state/cotizacion_state.dart';
 import 'state/navegacion_state.dart';
 import 'screens/main_tabs_screen.dart';
 import 'theme/brand_colors.dart';
+import 'utils/avisos.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // sqflite no tiene implementación nativa en navegador — en la build web
-  // (PWA) se guarda igual en el propio navegador (IndexedDB vía sqlite3
-  // compilado a WebAssembly), así que el catálogo sincronizado y el
-  // historial de cotizaciones siguen persistiendo entre sesiones ahí
-  // también, sin tocar ninguna pantalla ni el resto de DbHelper.
-  if (kIsWeb) {
-    databaseFactory = databaseFactoryFfiWeb;
-  }
+  // Cuando el servidor rechaza un cambio ("otra persona modificó esto...",
+  // "tu rol no permite..."), se le muestra el motivo a la persona.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (error is ApiError && !error.sesionVencida) avisar(error.mensaje);
+    return error is ApiError;
+  };
   await NotificacionesService.inicializar();
   runApp(const CotizadorApp());
 }
+
+/// Para volver a la pantalla de ingreso desde cualquier parte (la sesión venció).
+final navegadorKey = GlobalKey<NavigatorState>();
 
 class CotizadorApp extends StatelessWidget {
   const CotizadorApp({super.key});
@@ -47,9 +50,12 @@ class CotizadorApp extends StatelessWidget {
         Provider(create: (_) => BorradoresChecklist()),
         ChangeNotifierProvider(create: (_) => AlmacenState()),
         ChangeNotifierProvider(create: (_) => NavegacionState()),
+        ChangeNotifierProvider(create: (_) => AuthState()),
       ],
       child: MaterialApp(
         title: 'ICR Energy',
+        navigatorKey: navegadorKey,
+        scaffoldMessengerKey: mensajeroKey,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -100,19 +106,49 @@ class _SplashState extends State<_Splash> {
   // Además deja cargado Almacén, para que el Inicio ya muestre lo pendiente.
   Future<void> _cargar() async {
     try {
-      await DbHelper.instance.actualizarCatalogoBase();
+      final auth = context.read<AuthState>();
+      await auth.iniciar();
       if (!mounted) return;
-      await context.read<AlmacenState>().cargar();
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainTabsScreen()),
-      );
+      // Con servidor, si la sesión venció se vuelve a la pantalla de ingreso.
+      ApiCliente.instancia.alVencerSesion = () {
+        auth.olvidarSesion();
+        context.read<AlmacenState>().detenerActualizacionAutomatica();
+        navegadorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => LoginScreen(alEntrar: _entrarALaApp)),
+          (_) => false,
+        );
+      };
+      if (auth.requiereIngreso) {
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => LoginScreen(alEntrar: _entrarALaApp)));
+        return;
+      }
+      await _abrirApp();
     } catch (error) {
       // Sin esto, un catálogo semilla corrupto deja la app en este
       // spinner para siempre, sin ninguna pista de qué falló.
       if (!mounted) return;
       setState(() => _error = error);
     }
+  }
+
+  /// Después de ingresar: se carga todo y se abre la app.
+  void _entrarALaApp() {
+    navegadorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const _Splash()),
+      (_) => false,
+    );
+  }
+
+  Future<void> _abrirApp() async {
+    await DbHelper.instance.actualizarCatalogoBase();
+    if (!mounted) return;
+    final almacen = context.read<AlmacenState>();
+    await almacen.cargar();
+    almacen.iniciarActualizacionAutomatica();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainTabsScreen()),
+    );
   }
 
   @override
@@ -123,7 +159,7 @@ class _SplashState extends State<_Splash> {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'No se pudo cargar el catálogo inicial.\n\n$_error',
+              'No se pudo cargar la app.\n\n$_error',
               textAlign: TextAlign.center,
             ),
           ),

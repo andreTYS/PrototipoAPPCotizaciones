@@ -6,9 +6,11 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/checklist_categoria.dart';
 import '../models/requerimiento.dart';
+import '../services/db_helper.dart';
 import '../services/notificaciones_service.dart';
 import '../services/pdf_service.dart';
 import '../state/almacen_state.dart';
+import '../state/auth_state.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
 import '../utils/formato.dart';
@@ -59,12 +61,30 @@ class RequerimientoDetalleScreen extends StatelessWidget {
   }
 
   Future<void> _aprobar(BuildContext context, Requerimiento r) async {
-    final aprobadoPor = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _HojaAprobacion(),
-    );
+    final String? aprobadoPor;
+    if (DbHelper.instance.esServidor) {
+      // Con servidor no hay código: aprueba el encargado con su propio usuario.
+      final nombre = context.read<AuthState>().usuario?.nombre ?? '';
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Aprobar requerimiento'),
+          content: Text('¿Aprobar ${r.numero} como $nombre? Quedará pendiente de alistar para almacén.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Aprobar')),
+          ],
+        ),
+      );
+      aprobadoPor = confirmar == true ? nombre : null;
+    } else {
+      aprobadoPor = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const _HojaAprobacion(),
+      );
+    }
     if (aprobadoPor == null || !context.mounted) return;
     final actualizado = await context.read<AlmacenState>().aprobarRequerimiento(
           r,
@@ -235,6 +255,7 @@ class RequerimientoDetalleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = context.watch<AlmacenState>().requerimientoPorId(id);
+    final auth = context.watch<AuthState>();
     if (r == null) {
       return Scaffold(
         appBar: AppBar(),
@@ -264,11 +285,12 @@ class RequerimientoDetalleScreen extends StatelessWidget {
                   tooltip: 'Copiar como mensaje',
                   onPressed: () => _copiar(context, r),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.white),
-                  tooltip: 'Eliminar',
-                  onPressed: () => _eliminar(context, r),
-                ),
+                if (auth.esAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.white),
+                    tooltip: 'Eliminar',
+                    onPressed: () => _eliminar(context, r),
+                  ),
               ],
             ),
             Expanded(
@@ -355,14 +377,18 @@ class RequerimientoDetalleScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     if (r.estado == EstadoRequerimiento.pendiente)
-                      BotonPrincipal(
-                        texto: 'APROBAR COMO JEFE DE OBRA',
-                        icono: Icons.verified_user_outlined,
-                        color: BrandColors.azulMarino,
-                        onPressed: () => _aprobar(context, r),
-                      )
+                      auth.puedeAprobar
+                          ? BotonPrincipal(
+                              texto: 'APROBAR COMO JEFE DE OBRA',
+                              icono: Icons.verified_user_outlined,
+                              color: BrandColors.azulMarino,
+                              onPressed: () => _aprobar(context, r),
+                            )
+                          : const AvisoRol('Está esperando que un encargado lo apruebe.')
                     else if (r.estado == EstadoRequerimiento.aprobado)
-                      BotonPrincipal(
+                      !auth.puedeAlistar
+                          ? const AvisoRol('Almacén debe alistar los materiales.')
+                          : BotonPrincipal(
                         texto: r.totalAlistados == 0
                             ? 'ALISTAR MATERIALES'
                             : 'CONTINUAR ALISTANDO · ${r.totalAlistados} DE ${r.totalItems}',

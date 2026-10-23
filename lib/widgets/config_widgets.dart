@@ -2,9 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import '../models/producto.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
+import '../utils/fotos.dart';
 import 'animated_pressable.dart';
 
 /// Fila de una opción del menú de Configuración (ícono, título, detalle).
@@ -145,13 +146,7 @@ Future<String?> elegirFotoGuardada(BuildContext context, {String carpeta = 'foto
   try {
     final elegida = await ImagePicker().pickImage(source: origen, maxWidth: 1200, imageQuality: 80);
     if (elegida == null) return null;
-    final dir = await getApplicationDocumentsDirectory();
-    final carpetaFotos = Directory('${dir.path}/$carpeta');
-    if (!await carpetaFotos.exists()) await carpetaFotos.create(recursive: true);
-    final extension = elegida.path.contains('.') ? elegida.path.split('.').last : 'jpg';
-    final destino = '${carpetaFotos.path}/foto_${DateTime.now().millisecondsSinceEpoch}.$extension';
-    await File(elegida.path).copy(destino);
-    return destino;
+    return await guardarFotoElegida(elegida, carpeta: carpeta, prefijo: 'foto');
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo obtener la foto: $e')));
@@ -162,7 +157,7 @@ Future<String?> elegirFotoGuardada(BuildContext context, {String carpeta = 'foto
 
 /// Borra una foto guardada por la app (no toca las que vienen empaquetadas).
 Future<void> borrarFotoGuardada(String? ruta) async {
-  if (ruta == null || !ruta.startsWith('/')) return;
+  if (ruta == null || !ruta.startsWith('/') || esFotoDeServidor(ruta)) return;
   try {
     final archivo = File(ruta);
     if (await archivo.exists()) await archivo.delete();

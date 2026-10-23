@@ -7,6 +7,7 @@ import '../models/checklist_categoria.dart';
 import '../models/checklist_herramientas.dart';
 import '../services/pdf_service.dart';
 import '../state/almacen_state.dart';
+import '../state/auth_state.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
 import '../utils/formato.dart';
@@ -205,11 +206,12 @@ class HerramientasDetalleScreen extends StatelessWidget {
                   tooltip: 'Copiar como mensaje',
                   onPressed: () => _copiar(context, h),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.white),
-                  tooltip: 'Eliminar',
-                  onPressed: () => _eliminar(context, h),
-                ),
+                if (context.watch<AuthState>().esAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.white),
+                    tooltip: 'Eliminar',
+                    onPressed: () => _eliminar(context, h),
+                  ),
               ],
             ),
             Expanded(
@@ -334,20 +336,24 @@ class HerramientasDetalleScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     if (h.estado == EstadoHerramientas.registrado) ...[
-                      BotonPrincipal(
-                        texto: 'CONFIRMAR SALIDA',
-                        icono: Icons.outbox_outlined,
-                        color: ColoresEstado.pendiente,
-                        onPressed: () => _confirmarSalida(context, h),
-                      ),
+                      context.watch<AuthState>().puedeConfirmarSalida
+                          ? BotonPrincipal(
+                              texto: 'CONFIRMAR SALIDA',
+                              icono: Icons.outbox_outlined,
+                              color: ColoresEstado.pendiente,
+                              onPressed: () => _confirmarSalida(context, h),
+                            )
+                          : const AvisoRol('Almacén debe confirmar la salida.'),
                       const SizedBox(height: 10),
                     ] else if (!h.conforme) ...[
-                      BotonPrincipal(
-                        texto: 'CONFIRMAR DEVOLUCIÓN',
-                        icono: Icons.assignment_return_outlined,
-                        color: ColoresEstado.listo,
-                        onPressed: () => _confirmarDevolucion(context, h),
-                      ),
+                      context.watch<AuthState>().puedeConfirmarDevolucion
+                          ? BotonPrincipal(
+                              texto: 'CONFIRMAR DEVOLUCIÓN',
+                              icono: Icons.assignment_return_outlined,
+                              color: ColoresEstado.listo,
+                              onPressed: () => _confirmarDevolucion(context, h),
+                            )
+                          : const AvisoRol('Almacén o un encargado confirma la devolución.'),
                       const SizedBox(height: 10),
                     ],
                     Row(

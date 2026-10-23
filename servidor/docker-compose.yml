@@ -1,0 +1,93 @@
+# Cotizador ICR + Finanzas en un VPS: base de datos PostgreSQL + dos APIs + HTTPS automático.
+# Estructura esperada:  /opt/icr/servidor (esta carpeta) y /opt/icr/finanzas (al lado).
+#   1) cp .env.example .env   y completa los valores
+#   2) docker compose up -d --build
+# Más detalles en DESPLIEGUE.md
+name: icr
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cotizador
+      POSTGRES_USER: icr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en el archivo .env}
+      TZ: America/Lima
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U icr -d cotizador"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Sin "ports": la base solo se ve desde la API, nunca desde internet.
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://icr:${POSTGRES_PASSWORD}@db:5432/cotizador
+      ADMIN_USUARIO: ${ADMIN_USUARIO:-admin}
+      ADMIN_CLAVE: ${ADMIN_CLAVE:?Falta ADMIN_CLAVE en el archivo .env}
+      CLAVE_EDICION: ${CLAVE_EDICION:-1234}
+      TZ: America/Lima
+    volumes:
+      - uploads:/app/uploads
+
+  # Finanzas (caja diaria y caja chica). Usa la MISMA base y los MISMOS usuarios y sesiones que la API de arriba:
+  # quien entra en la app entra aquí con el mismo usuario; su rol decide qué puede hacer.
+  finanzas-api:
+    build:
+      context: ../finanzas
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://icr:${POSTGRES_PASSWORD}@db:5432/cotizador
+      MAIN_API_URL: http://api:3000
+      API_PREFIX: /api-caja
+      UPLOAD_DIR: /data/fotos
+      FINANZAS_ROLES: ${FINANZAS_ROLES:-}
+      FINANZAS_ROLES_CORREGIR: ${FINANZAS_ROLES_CORREGIR:-}
+      FINANZAS_ROLES_CERRAR: ${FINANZAS_ROLES_CERRAR:-}
+      FINANZAS_ROLES_REABRIR: ${FINANZAS_ROLES_REABRIR:-}
+      FINANZAS_ROLES_CONFIG: ${FINANZAS_ROLES_CONFIG:-}
+      FINANZAS_ROLES_REVISAR: ${FINANZAS_ROLES_REVISAR:-}
+      TZ: America/Lima
+    volumes:
+      - finanzas_fotos:/data/fotos
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - finanzas-api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:?Falta DOMINIO en el archivo .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web:/srv/web:ro
+      - ./finanzas-web:/srv/finanzas:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  uploads:
+  finanzas_fotos:
+  caddy_data:
+  caddy_config:

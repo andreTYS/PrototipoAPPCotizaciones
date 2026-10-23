@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../models/producto.dart';
+import 'imagen_ruta.dart';
 
 /// Miniatura de producto para las listas de categoría y de cotización.
 /// Las fotos van empaquetadas dentro de la propia app (assets/productos/),
@@ -33,21 +32,13 @@ class ProductoThumbnail extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
-      child: esRutaDeArchivo(archivo)
-          ? Image.file(
-              File(archivo),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) => placeholder,
-            )
-          : Image.asset(
-              'assets/productos/$archivo',
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) => placeholder,
-            ),
+      child: imagenDeRuta(
+        archivo,
+        width: size,
+        height: size,
+        prefijoAsset: 'assets/productos/',
+        errorBuilder: (context, error, stack) => placeholder,
+      ),
     );
   }
 }

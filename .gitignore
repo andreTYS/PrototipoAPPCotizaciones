@@ -49,3 +49,12 @@ app.*.map.json
 
 # backend-api/: credenciales reales de Postgres/.env, nunca al repo
 backend-api/.env
+
+# Servidor compartido (VPS)
+servidor/.env
+servidor/datos/
+servidor/web/
+servidor/web.anterior/
+servidor/respaldos/
+servidor/finanzas-web/
+servidor/finanzas-web.anterior/

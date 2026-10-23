@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/checklist_categoria.dart';
@@ -9,6 +8,7 @@ import '../theme/brand_colors.dart';
 import '../utils/checklist_estilo.dart';
 import '../utils/formato.dart';
 import 'animated_pressable.dart';
+import 'imagen_ruta.dart';
 
 /// Colores de estado de Almacén — aparte de los de marca, porque tienen que
 /// leerse de un vistazo: ámbar = falta algo, azul = aprobado / registrado,
@@ -566,6 +566,33 @@ class BotonPrincipal extends StatelessWidget {
   }
 }
 
+/// En lugar de un botón, cuando el rol de la persona no permite esa acción
+/// (por ejemplo, aprobar es del encargado): le dice quién la hace.
+class AvisoRol extends StatelessWidget {
+  final String texto;
+
+  const AvisoRol(this.texto, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(child: Text(texto, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+        ],
+      ),
+    );
+  }
+}
+
 /// La foto es un asset de la app (las que vienen con ella) o un archivo del
 /// celular (las que se toman desde Configuración).
 Widget _imagenHerramienta(
@@ -573,9 +600,7 @@ Widget _imagenHerramienta(
   double? height,
   ImageErrorWidgetBuilder? errorBuilder,
 }) {
-  return ruta.startsWith('/')
-      ? Image.file(File(ruta), fit: BoxFit.contain, height: height, errorBuilder: errorBuilder)
-      : Image.asset(ruta, fit: BoxFit.contain, height: height, errorBuilder: errorBuilder);
+  return imagenDeRuta(ruta, fit: BoxFit.contain, height: height, errorBuilder: errorBuilder);
 }
 
 /// Dónde va una herramienta de una salida, según lo marcado al confirmar

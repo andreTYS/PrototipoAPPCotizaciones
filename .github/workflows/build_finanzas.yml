@@ -1,0 +1,50 @@
+name: Build finanzas
+
+# Prueba y arma la app de Finanzas (PWA) lista para subir al VPS. Se lanza a mano desde la
+# pestaña Actions ("Run workflow") y deja un zip descargable: finanzas-web.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            finanzas/app/package-lock.json
+            finanzas/api/package-lock.json
+
+      - name: Instalar dependencias de la app
+        run: npm ci
+        working-directory: finanzas/app
+
+      - name: Instalar dependencias de la API
+        run: npm ci
+        working-directory: finanzas/api
+
+      - name: Revisar tipos y probar la app
+        run: npm run typecheck && npm test
+        working-directory: finanzas/app
+
+      # Incluye las migraciones sobre Postgres (PGlite) y las pruebas con varias personas a la vez.
+      - name: Revisar tipos y probar la API
+        run: npm run typecheck && npm test
+        working-directory: finanzas/api
+
+      - name: Compilar la PWA
+        run: npm run build:web
+        working-directory: finanzas/app
+        env:
+          EXPO_PUBLIC_API_URL: /api-caja
+
+      - name: Subir la app como artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: finanzas-web
+          path: finanzas/app/dist

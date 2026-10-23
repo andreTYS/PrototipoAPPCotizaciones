@@ -2,11 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models/producto.dart';
 import '../services/db_helper.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
+import '../utils/fotos.dart';
 import '../widgets/producto_thumbnail.dart';
 
 const _unidadesMedida = ['Unidades', 'm', 'Otra'];
@@ -89,12 +89,7 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
     try {
       final elegida = await ImagePicker().pickImage(source: origen, maxWidth: 1200, imageQuality: 80);
       if (elegida == null) return;
-      final dir = await getApplicationDocumentsDirectory();
-      final carpeta = Directory('${dir.path}/productos_locales');
-      if (!await carpeta.exists()) await carpeta.create(recursive: true);
-      final extension = elegida.path.contains('.') ? elegida.path.split('.').last : 'jpg';
-      final destino = '${carpeta.path}/producto_${DateTime.now().millisecondsSinceEpoch}.$extension';
-      await File(elegida.path).copy(destino);
+      final destino = await guardarFotoElegida(elegida, carpeta: 'productos_locales', prefijo: 'producto');
       if (!mounted) return;
       setState(() => _foto = destino);
     } catch (e) {

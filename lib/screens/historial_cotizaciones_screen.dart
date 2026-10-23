@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -214,8 +215,16 @@ class _HistorialCotizacionesScreenState extends State<HistorialCotizacionesScree
   }
 }
 
-Future<bool> _verificarArchivo(BuildContext context, String ruta) async {
-  final existe = await PdfService.existeArchivo(ruta);
+/// El PDF de una cotización. Con servidor (o si no hay archivo) se arma de
+/// nuevo con los datos guardados; sin servidor se lee el archivo del celular.
+Future<Uint8List> _bytesDeCotizacion(CotizacionGuardada c) async {
+  if (DbHelper.instance.esServidor || c.archivoPdf.isEmpty) return PdfService.bytesCotizacion(c);
+  return File(c.archivoPdf).readAsBytes();
+}
+
+Future<bool> _verificarArchivo(BuildContext context, CotizacionGuardada c) async {
+  if (DbHelper.instance.esServidor || c.archivoPdf.isEmpty) return true;
+  final existe = await File(c.archivoPdf).exists();
   if (!existe && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Ese PDF ya no está disponible en el celular.')),
@@ -225,8 +234,8 @@ Future<bool> _verificarArchivo(BuildContext context, String ruta) async {
 }
 
 Future<void> compartirCotizacion(BuildContext context, CotizacionGuardada c) async {
-  if (!await _verificarArchivo(context, c.archivoPdf)) return;
-  final bytes = await PdfService.leerArchivo(c.archivoPdf);
+  if (!await _verificarArchivo(context, c)) return;
+  final bytes = await _bytesDeCotizacion(c);
   await Printing.sharePdf(bytes: bytes, filename: 'cotizacion_${c.numero}.pdf');
 }
 
@@ -253,7 +262,14 @@ Future<bool> eliminarCotizacion(BuildContext context, CotizacionGuardada c) asyn
   );
   if (confirmar != true) return false;
   await DbHelper.instance.eliminarCotizacion(c.id!);
-  await PdfService.eliminarArchivo(c.archivoPdf);
+  if (!DbHelper.instance.esServidor && c.archivoPdf.isNotEmpty) {
+    try {
+      final archivo = File(c.archivoPdf);
+      if (await archivo.exists()) await archivo.delete();
+    } catch (_) {
+      // No pasa nada si el archivo ya no está o no se puede borrar.
+    }
+  }
   return true;
 }
 
@@ -394,8 +410,9 @@ class _CotizacionDetalleScreenState extends State<CotizacionDetalleScreen> {
     );
     if (editada == null || !context.mounted) return;
     try {
-      final ruta = await PdfService.regenerarCotizacion(editada);
-      final guardada = CotizacionGuardada(
+      // Con servidor no hay archivo: el PDF se arma al abrirlo.
+      final ruta = DbHelper.instance.esServidor ? '' : await PdfService.regenerarCotizacion(editada);
+      final aGuardar = CotizacionGuardada(
         id: editada.id,
         numero: editada.numero,
         cliente: editada.cliente,
@@ -410,8 +427,9 @@ class _CotizacionDetalleScreenState extends State<CotizacionDetalleScreen> {
         total: editada.total,
         archivoPdf: ruta,
         items: editada.items,
+        version: editada.version,
       );
-      await DbHelper.instance.actualizarCotizacion(guardada);
+      final guardada = await DbHelper.instance.actualizarCotizacion(aGuardar);
       if (!mounted) return;
       setState(() => cotizacion = guardada);
       ScaffoldMessenger.of(this.context).showSnackBar(
@@ -425,7 +443,7 @@ class _CotizacionDetalleScreenState extends State<CotizacionDetalleScreen> {
   }
 
   Future<void> _verPdf(BuildContext context) async {
-    if (!await _verificarArchivo(context, cotizacion.archivoPdf)) return;
+    if (!await _verificarArchivo(context, cotizacion)) return;
     if (!context.mounted) return;
     Navigator.push(
       context,
@@ -433,7 +451,7 @@ class _CotizacionDetalleScreenState extends State<CotizacionDetalleScreen> {
         builder: (_) => VistaPreviaPdfScreen(
           titulo: 'Cotización ${cotizacion.numero}',
           nombreArchivo: 'cotizacion_${cotizacion.numero}.pdf',
-          generar: () => PdfService.leerArchivo(cotizacion.archivoPdf),
+          generar: () => _bytesDeCotizacion(cotizacion),
         ),
       ),
     );
@@ -600,6 +618,8 @@ class _CotizacionDetalleScreenState extends State<CotizacionDetalleScreen> {
   }
 }
 
+String _cantidadCorta(double n) => n == n.truncateToDouble() ? n.toStringAsFixed(0) : n.toStringAsFixed(2);
+
 class _FilaProductoDetalle extends StatelessWidget {
   final ItemCotizacionGuardado item;
   final NumberFormat moneda;
@@ -609,7 +629,7 @@ class _FilaProductoDetalle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unidad = (item.unidadMedida ?? '').trim();
-    final cantidadTexto = unidad.isEmpty ? '${item.cantidad}' : '${item.cantidad} $unidad';
+    final cantidadTexto = unidad.isEmpty ? _cantidadCorta(item.cantidad) : '${_cantidadCorta(item.cantidad)} $unidad';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0D2233">
+<title>ICR · Vista general</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --fondo: #f5f9fb; --tarjeta: #ffffff; --borde: #dbe5ea; --texto: #0d2233; --suave: #64748b;
+    --marino: #0d2233; --cian: #0e7490; --verde: #15803d; --verde-f: #dcfce7; --ambar: #b45309; --ambar-f: #fef3c7;
+    --azul: #1d4ed8; --azul-f: #dbeafe; --rojo: #b91c1c; --rojo-f: #fee2e2; --gris-f: #eef2f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #0b1620; --tarjeta: #12212e; --borde: #243746; --texto: #e6eef3; --suave: #93a4b3;
+      --marino: #07111a; --cian: #38bdf8; --verde: #4ade80; --verde-f: #14301f; --ambar: #fbbf24; --ambar-f: #3a2c0b;
+      --azul: #93c5fd; --azul-f: #172c52; --rojo: #fca5a5; --rojo-f: #3b1616; --gris-f: #1a2c3a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--fondo); color: var(--texto); }
+  header { background: var(--marino); color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 700; }
+  header .quien { font-size: 13px; opacity: .85; }
+  button { font: inherit; cursor: pointer; }
+  .btn { border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); padding: 8px 14px; border-radius: 10px; font-weight: 600; font-size: 14px; }
+  .btn.primario { background: var(--cian); border-color: var(--cian); color: #fff; }
+  header .btn { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); padding: 6px 12px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 18px 16px 40px; }
+  .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px; padding: 14px 16px; }
+  .kpi b { display: block; font-size: 26px; line-height: 1.15; white-space: nowrap; }
+  .kpi span { font-size: 12.5px; color: var(--suave); }
+  .kpi.alerta b { color: var(--rojo); }
+  nav.pestanas { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  nav.pestanas button { border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); padding: 9px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  nav.pestanas button.activa { background: var(--marino); color: #fff; border-color: var(--marino); }
+  .barra { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  .barra input, .barra select, .campo input, .campo select { font: inherit; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); }
+  .barra input { flex: 1; min-width: 180px; }
+  .tabla { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); padding: 10px 14px; background: var(--gris-f); }
+  td { padding: 11px 14px; border-top: 1px solid var(--borde); vertical-align: top; }
+  tbody tr.fila { cursor: pointer; }
+  tbody tr.fila:hover { background: var(--gris-f); }
+  .num { white-space: nowrap; text-align: right; }
+  .pildora { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .p-pendiente { background: var(--ambar-f); color: var(--ambar); }
+  .p-aprobado, .p-registrado { background: var(--azul-f); color: var(--azul); }
+  .p-listo, .p-conforme, .p-entregado { background: var(--verde-f); color: var(--verde); }
+  .p-urgente { background: var(--rojo-f); color: var(--rojo); }
+  .p-gris { background: var(--gris-f); color: var(--suave); }
+  .vacio { padding: 36px 16px; text-align: center; color: var(--suave); }
+  .pie { color: var(--suave); font-size: 12.5px; margin-top: 10px; }
+  .oculto { display: none !important; }
+  /* inicio de sesión */
+  .acceso { max-width: 360px; margin: 12vh auto 0; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 18px; padding: 26px; }
+  .acceso h2 { margin: 0 0 4px; } .acceso p { color: var(--suave); margin: 0 0 18px; font-size: 14px; }
+  .campo { display: block; margin-bottom: 12px; font-size: 13px; color: var(--suave); }
+  .campo input, .campo select { width: 100%; margin-top: 4px; }
+  .error { color: var(--rojo); font-size: 13.5px; margin: 6px 0 10px; min-height: 1em; }
+  /* detalle */
+  dialog { border: 1px solid var(--borde); border-radius: 16px; padding: 0; width: min(760px, 94vw); max-height: 90vh; background: var(--tarjeta); color: var(--texto); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .d-cab { padding: 16px 20px; border-bottom: 1px solid var(--borde); display: flex; gap: 10px; align-items: center; }
+  .d-cab h3 { margin: 0; flex: 1; font-size: 18px; }
+  .d-cuerpo { padding: 16px 20px 22px; overflow: auto; max-height: calc(90vh - 70px); }
+  .datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 18px; margin-bottom: 14px; }
+  .datos div small { display: block; color: var(--suave); font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .cat { margin-top: 14px; font-weight: 700; color: var(--cian); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .obs { background: var(--gris-f); border-radius: 10px; padding: 10px 12px; white-space: pre-wrap; font-size: 13.5px; margin: 8px 0; }
+  .ok { color: var(--verde); font-weight: 700; } .no { color: var(--rojo); font-weight: 700; } .nuevo { color: var(--ambar); font-size: 12px; font-weight: 700; }
+  @media (max-width: 640px) { th:nth-child(n+4), td:nth-child(n+4) { display: none; } }
+</style>
+</head>
+<body>
+
+<section id="vistaAcceso" class="oculto">
+  <form class="acceso" id="formAcceso">
+    <h2>ICR · Vista general</h2>
+    <p>Ingresa con tu usuario para ver lo que hace todo el equipo.</p>
+    <label class="campo">Usuario<input id="usuario" autocomplete="username" autocapitalize="off" required></label>
+    <label class="campo">Clave<input id="clave" type="password" autocomplete="current-password" required></label>
+    <div class="error" id="errorAcceso"></div>
+    <button class="btn primario" style="width:100%" type="submit">Entrar</button>
+  </form>
+</section>
+
+<section id="vistaApp" class="oculto">
+  <header>
+    <h1>ICR · Vista general</h1>
+    <span class="quien" id="quien"></span>
+    <button class="btn" id="btnActualizar" title="Actualizar ahora">Actualizar</button>
+    <button class="btn" id="btnSalir">Salir</button>
+  </header>
+  <main>
+    <div class="tarjetas" id="tarjetas"></div>
+    <nav class="pestanas" id="pestanas"></nav>
+    <div id="contenido"></div>
+    <p class="pie" id="pie"></p>
+  </main>
+</section>
+
+<dialog id="detalle"><div class="d-cab"><h3 id="dTitulo"></h3><button class="btn" id="dCerrar">Cerrar</button></div><div class="d-cuerpo" id="dCuerpo"></div></dialog>
+
+<script>
+'use strict';
+const API = '/api';
+const API_CAJA = '/api-caja'; // la API de Finanzas (mismo usuario y misma sesión)
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const soles = (n) => 'S/ ' + Number(n || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fecha = (iso) => {
+  if (!iso) return '—';
+  const m = /^(\d{4})-(\d\d)-(\d\d)[T ](\d\d):(\d\d)/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : iso;
+};
+const ETIQ = {
+  pendiente: 'Pendiente de aprobación', aprobado: 'Aprobado · por alistar', listo: 'Listo para entrega', entregado: 'Entregado',
+  registrado: 'Salida por confirmar', conforme: 'Conforme',
+};
+const ETIQ_HER = { pendiente: 'En obra · por devolver' };
+const pildora = (estado, tipo) => `<span class="pildora p-${esc(estado)}">${esc((tipo === 'her' && ETIQ_HER[estado]) || ETIQ[estado] || estado)}</span>`;
+const ROLES = { admin: 'Administrador', empleado: 'Empleado', encargado: 'Encargado', almacen: 'Almacén', vendedor: 'Vendedor', finanzas: 'Finanzas' };
+const VE_FINANZAS = ['admin', 'finanzas', 'encargado'];
+
+let token = null, yo = null, pestana = 'requerimientos', datos = {}, filtro = { q: '', estado: '' }, reloj = null;
+
+async function api(metodo, ruta, cuerpo) {
+  const r = await fetch(API + ruta, {
+    method: metodo,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+  });
+  const texto = await r.text();
+  const json = texto ? JSON.parse(texto) : null;
+  if (r.status === 401 && token) { salir(); throw new Error('La sesión venció. Ingresa de nuevo.'); }
+  if (!r.ok) throw new Error((json && json.error) || 'Error ' + r.status);
+  return json;
+}
+
+async function apiCaja(ruta) {
+  const r = await fetch(API_CAJA + ruta, { headers: { Authorization: 'Bearer ' + token } });
+  const json = await r.json().catch(() => null);
+  if (r.status === 401) { salir(); throw new Error('La sesión venció. Ingresa de nuevo.'); }
+  if (!r.ok || !json || json.status !== 'success') throw new Error((json && json.error && json.error.message) || 'Error ' + r.status);
+  return json.data;
+}
+
+/* ---------------- sesión ---------------- */
+function mostrar(vista) { $('vistaAcceso').classList.toggle('oculto', vista !== 'acceso'); $('vistaApp').classList.toggle('oculto', vista !== 'app'); }
+function salir() {
+  try { localStorage.removeItem('icr_token'); } catch {}
+  token = null; yo = null; clearInterval(reloj); mostrar('acceso');
+}
+$('formAcceso').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('errorAcceso').textContent = '';
+  try {
+    const r = await api('POST', '/login', { usuario: $('usuario').value, clave: $('clave').value });
+    token = r.token; yo = r.usuario; $('clave').value = '';
+    try { localStorage.setItem('icr_token', token); } catch {}
+    iniciar();
+  } catch (err) { $('errorAcceso').textContent = err.message; }
+});
+$('btnSalir').addEventListener('click', async () => { try { await api('POST', '/logout'); } catch {} salir(); });
+$('btnActualizar').addEventListener('click', () => cargar());
+
+async function arrancar() {
+  try { token = localStorage.getItem('icr_token'); } catch { token = null; }
+  if (!token) return mostrar('acceso');
+  try { yo = await api('GET', '/yo'); iniciar(); } catch { salir(); }
+}
+
+function iniciar() {
+  const rol = ROLES[yo.rol] || yo.rol;
+  $('quien').textContent = yo.nombre === rol ? rol : `${yo.nombre} · ${rol}`;
+  mostrar('app');
+  pestana = yo.rol === 'finanzas' ? 'finanzas' : 'requerimientos';
+  dibujarPestanas();
+  cargar();
+  clearInterval(reloj);
+  reloj = setInterval(cargar, 30000);
+}
+
+/* ---------------- datos ---------------- */
+async function cargar() {
+  try {
+    const [resumen, requerimientos, herramientas, cotizaciones] = await Promise.all([
+      api('GET', '/resumen'), api('GET', '/requerimientos'), api('GET', '/herramientas'), api('GET', '/cotizaciones'),
+    ]);
+    datos = { ...datos, resumen, requerimientos, herramientas, cotizaciones };
+    if (pestana === 'usuarios' && yo.rol === 'admin') datos.usuarios = await api('GET', '/usuarios');
+    if (pestana === 'bitacora') datos.bitacora = await api('GET', '/bitacora');
+    if (pestana === 'finanzas') await cargarFinanzas();
+    $('pie').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-PE') + ' · se actualiza solo cada 30 segundos';
+    dibujarTarjetas(); dibujar();
+  } catch (err) { $('pie').textContent = 'No se pudo actualizar: ' + err.message; }
+}
+
+function dibujarTarjetas() {
+  const r = datos.resumen; if (!r) return;
+  const q = r.requerimientos, h = r.herramientas, c = r.cotizaciones;
+  const kpi = (n, t, alerta) => `<div class="kpi ${alerta ? 'alerta' : ''}"><b>${esc(n)}</b><span>${esc(t)}</span></div>`;
+  $('tarjetas').innerHTML =
+    kpi(q.pendiente || 0, 'Requerimientos por aprobar') + kpi(q.aprobado || 0, 'Por alistar en almacén') +
+    kpi(q.listo || 0, 'Listos para entrega') + kpi(r.urgentes || 0, 'Urgentes sin entregar', r.urgentes > 0) +
+    kpi((h.registrado || 0) + (h.pendiente || 0), 'Herramientas en obra o por salir') +
+    kpi(c.este_mes || 0, 'Cotizaciones este mes') + kpi(soles(c.monto_mes), 'Monto cotizado este mes');
+}
+
+/* ---------------- pestañas ---------------- */
+function dibujarPestanas() {
+  const lista = [['requerimientos', 'Requerimientos'], ['herramientas', 'Herramientas'], ['cotizaciones', 'Cotizaciones']];
+  if (VE_FINANZAS.includes(yo.rol)) lista.unshift(['finanzas', 'Finanzas']);
+  if (yo.rol === 'admin') lista.push(['usuarios', 'Usuarios']);
+  if (yo.rol === 'admin' || yo.rol === 'encargado') lista.push(['bitacora', 'Quién hizo qué']);
+  $('pestanas').innerHTML = lista.map(([k, t]) => `<button data-p="${k}" class="${k === pestana ? 'activa' : ''}">${t}</button>`).join('');
+  $('pestanas').querySelectorAll('button').forEach((b) => b.addEventListener('click', async () => {
+    pestana = b.dataset.p; filtro = { q: '', estado: '' }; dibujarPestanas();
+    if (pestana === 'usuarios') datos.usuarios = await api('GET', '/usuarios');
+    if (pestana === 'bitacora') datos.bitacora = await api('GET', '/bitacora');
+    if (pestana === 'finanzas') { dibujar(); await cargarFinanzas(); }
+    dibujar();
+  }));
+}
+
+function barra(estados) {
+  return `<div class="barra"><input id="fQ" placeholder="Buscar…" value="${esc(filtro.q)}">` +
+    (estados ? `<select id="fE"><option value="">Todos los estados</option>${estados.map(([k, t]) => `<option value="${k}" ${filtro.estado === k ? 'selected' : ''}>${t}</option>`).join('')}</select>` : '') + '</div>';
+}
+function enlazarBarra() {
+  const q = $('fQ'), e = $('fE');
+  if (q) q.addEventListener('input', () => { filtro.q = q.value; dibujarFilas(); });
+  if (e) e.addEventListener('change', () => { filtro.estado = e.value; dibujarFilas(); });
+}
+const coincide = (texto) => !filtro.q || texto.toLowerCase().includes(filtro.q.toLowerCase());
+
+function dibujar() {
+  const c = $('contenido');
+  if (pestana === 'requerimientos') c.innerHTML = barra([['pendiente', 'Por aprobar'], ['aprobado', 'Por alistar'], ['listo', 'Listos'], ['entregado', 'Entregados']]) + '<div class="tabla" id="tabla"></div>';
+  else if (pestana === 'herramientas') c.innerHTML = barra([['registrado', 'Por confirmar salida'], ['pendiente', 'En obra'], ['conforme', 'Conformes']]) + '<div class="tabla" id="tabla"></div>';
+  else if (pestana === 'cotizaciones') c.innerHTML = barra(null) + '<div class="tabla" id="tabla"></div>';
+  else if (pestana === 'finanzas') return dibujarFinanzas();
+  else if (pestana === 'usuarios') return dibujarUsuarios();
+  else if (pestana === 'bitacora') return dibujarBitacora();
+  enlazarBarra(); dibujarFilas();
+}
+
+function tabla(cabeceras, filas, vacio) {
+  if (!filas.length) return `<div class="vacio">${vacio}</div>`;
+  return `<table><thead><tr>${cabeceras.map((h, i) => `<th class="${h.endsWith('#') ? 'num' : ''}">${esc(h.replace('#', ''))}</th>`).join('')}</tr></thead><tbody>${filas.join('')}</tbody></table>`;
+}
+
+function contarItems(json) {
+  let n = 0, hechos = 0;
+  for (const c of JSON.parse(json || '[]')) for (const i of c.items || []) { n++; if (i.alistado) hechos++; }
+  return { n, hechos };
+}
+
+function dibujarFilas() {
+  const t = $('tabla'); if (!t) return;
+  if (pestana === 'requerimientos') {
+    const filas = (datos.requerimientos || []).filter((r) => (!filtro.estado || r.estado === filtro.estado) && coincide(`${r.numero} ${r.obra} ${r.solicitante}`)).map((r) => {
+      const { n, hechos } = contarItems(r.categorias_json);
+      const progreso = r.estado === 'aprobado' ? ` · alistados ${hechos}/${n}` : '';
+      return `<tr class="fila" data-id="${r.id}"><td><b>${esc(r.numero)}</b></td><td>${esc(r.obra)}</td><td>${esc(r.solicitante)}</td><td>${pildora(r.estado)}${r.urgente && r.estado !== 'entregado' ? ' <span class="pildora p-urgente">Urgente</span>' : ''}<small style="color:var(--suave)">${progreso}</small></td><td>${fecha(r.fecha_creacion)}</td></tr>`;
+    });
+    t.innerHTML = tabla(['Número', 'Obra', 'Solicitante', 'Estado', 'Creado'], filas, 'No hay requerimientos con ese filtro.');
+    t.querySelectorAll('tr.fila').forEach((f) => f.addEventListener('click', () => detalleReq(Number(f.dataset.id))));
+  } else if (pestana === 'herramientas') {
+    const filas = (datos.herramientas || []).filter((h) => (!filtro.estado || h.estado === filtro.estado) && coincide(`${h.numero} ${h.obra} ${h.responsable} ${h.maleta || ''}`)).map((h) =>
+      `<tr class="fila" data-id="${h.id}"><td><b>${esc(h.numero)}</b></td><td>${esc(h.obra)}</td><td>${esc(h.responsable)}${h.maleta ? ' · ' + esc(h.maleta) : ''}</td><td>${pildora(h.estado, 'her')}</td><td>${fecha(h.fecha_salida)}</td></tr>`);
+    t.innerHTML = tabla(['Número', 'Obra', 'Responsable', 'Estado', 'Salida'], filas, 'No hay salidas de herramientas con ese filtro.');
+    t.querySelectorAll('tr.fila').forEach((f) => f.addEventListener('click', () => detalleHer(Number(f.dataset.id))));
+  } else if (pestana === 'cotizaciones') {
+    const filas = (datos.cotizaciones || []).filter((c) => coincide(`${c.numero} ${c.cliente} ${c.vendedor || ''}`)).map((c) =>
+      `<tr class="fila" data-id="${c.id}"><td><b>${esc(c.numero)}</b></td><td>${esc(c.cliente || 'Cliente sin nombre')}</td><td>${esc(c.vendedor || '—')}</td><td class="num">${soles(c.total)}</td><td>${fecha(c.fecha)}</td></tr>`);
+    t.innerHTML = tabla(['Número', 'Cliente', 'Vendedor', 'Total#', 'Fecha'], filas, 'No hay cotizaciones con ese filtro.');
+    t.querySelectorAll('tr.fila').forEach((f) => f.addEventListener('click', () => detalleCot(Number(f.dataset.id))));
+  }
+}
+
+/* ---------------- detalles ---------------- */
+const dato = (t, v) => `<div><small>${esc(t)}</small>${v}</div>`;
+function abrir(titulo, html) { $('dTitulo').textContent = titulo; $('dCuerpo').innerHTML = html; $('detalle').showModal(); }
+$('dCerrar').addEventListener('click', () => $('detalle').close());
+$('detalle').addEventListener('click', (e) => { if (e.target === $('detalle')) $('detalle').close(); });
+
+function itemsPorCategoria(json, columnas) {
+  let html = '';
+  for (const c of JSON.parse(json || '[]')) {
+    html += `<div class="cat">${esc(String(c.nombre).replace(/^\d+\.\s*/, ''))}</div>`;
+    html += '<table><tbody>' + (c.items || []).map((i) => `<tr>${columnas(i)}</tr>`).join('') + '</tbody></table>';
+  }
+  return html || '<div class="vacio">Sin detalle.</div>';
+}
+
+function detalleReq(id) {
+  const r = datos.requerimientos.find((x) => x.id === id); if (!r) return;
+  const total = JSON.parse(r.categorias_json || '[]').flatMap((c) => c.items || []).reduce((s, i) => s + (i.precio || 0) * (i.cantidad || 0), 0);
+  const html =
+    `<div class="datos">${dato('Estado', pildora(r.estado) + (r.urgente ? ' <span class="pildora p-urgente">Urgente</span>' : ''))}${dato('Obra', esc(r.obra))}${dato('Solicitante', esc(r.solicitante))}` +
+    dato('Creado', fecha(r.fecha_creacion)) + dato('Aprobado', r.fecha_aprobacion ? `${fecha(r.fecha_aprobacion)} · ${esc(r.aprobado_por || '')}` : '—') +
+    dato('Listo para entrega', r.fecha_listo ? `${fecha(r.fecha_listo)} · ${esc(r.alistado_por || '')}` : '—') +
+    dato('Entregado', r.fecha_entrega ? `${fecha(r.fecha_entrega)} · ${esc(r.recibido_por || '')}` : '—') +
+    dato('Último cambio', `${fecha(r.actualizado_en)} · ${esc(r.actualizado_por || '')}`) + (total ? dato('Total estimado', soles(total)) : '') + '</div>' +
+    (r.observaciones ? `<div class="obs">${esc(r.observaciones)}</div>` : '') +
+    itemsPorCategoria(r.categorias_json, (i) =>
+      `<td>${esc(i.texto)}${i.agregado_despues ? ' <span class="nuevo">agregado después</span>' : ''}</td><td class="num">× ${esc(i.cantidad)}${i.unidad ? ' ' + esc(i.unidad) : ''}</td>` +
+      `<td class="num">${i.precio != null ? soles(i.precio * i.cantidad) : ''}</td>` +
+      `<td>${i.alistado ? `<span class="ok">✓ alistado</span> <small>${esc(i.alistado_por || '')} ${i.fecha_alistado ? fecha(i.fecha_alistado) : ''}</small>` : '<span style="color:var(--suave)">por alistar</span>'}</td>`);
+  abrir(`${r.numero} · ${r.obra}`, html);
+}
+
+function detalleHer(id) {
+  const h = datos.herramientas.find((x) => x.id === id); if (!h) return;
+  const html =
+    `<div class="datos">${dato('Estado', pildora(h.estado, 'her'))}${dato('Obra', esc(h.obra))}${dato('Responsable', esc(h.responsable))}${h.maleta ? dato('Maleta', esc(h.maleta)) : ''}` +
+    dato('Registrada', fecha(h.fecha_salida)) + dato('Salida confirmada', h.fecha_confirmacion_salida ? `${fecha(h.fecha_confirmacion_salida)} · ${esc(h.salida_confirmada_por || '')}` : '—') +
+    dato('Devolución', h.fecha_devolucion ? `${fecha(h.fecha_devolucion)} · ${esc(h.encargado || '')}` : '—') + dato('Último cambio', `${fecha(h.actualizado_en)} · ${esc(h.actualizado_por || '')}`) + '</div>' +
+    (h.observaciones ? `<div class="obs">${esc(h.observaciones)}</div>` : '') + (h.observaciones_devolucion ? `<div class="obs">Devolución: ${esc(h.observaciones_devolucion)}</div>` : '') +
+    itemsPorCategoria(h.categorias_json, (i) => {
+      const salio = i.salio === false ? '<span class="no">no salió</span>' : i.salio ? '<span class="ok">salió</span>' : '<span style="color:var(--suave)">por salir</span>';
+      const volvio = i.salio === false ? '' : i.volvio === false ? '<span class="no">no volvió</span>' : i.volvio ? '<span class="ok">devuelta</span>' : '';
+      return `<td>${esc(i.texto)}${i.agregado_despues ? ' <span class="nuevo">agregada después</span>' : ''}</td><td class="num">× ${esc(i.cantidad)}</td><td>${salio}</td><td>${volvio}</td>`;
+    });
+  abrir(`${h.numero} · ${h.obra}`, html);
+}
+
+function detalleCot(id) {
+  const c = datos.cotizaciones.find((x) => x.id === id); if (!c) return;
+  const items = JSON.parse(c.items_json || '[]');
+  const html =
+    `<div class="datos">${dato('Cliente', esc(c.cliente || '—'))}${dato('RUC / DNI', esc(c.ruc_dni || '—'))}${dato('Teléfono', esc(c.telefono || '—'))}${dato('Vendedor', esc(c.vendedor || '—'))}` +
+    dato('Fecha', fecha(c.fecha)) + dato('Total', `<b>${soles(c.total)}</b>`) + dato('Último cambio', `${fecha(c.actualizado_en)} · ${esc(c.actualizado_por || '')}`) + '</div>' +
+    '<table><thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">P. unit.</th><th class="num">Subtotal</th></tr></thead><tbody>' +
+    items.map((i) => `<tr><td>${esc(i.nombre)}</td><td class="num">${esc(i.cantidad)}</td><td class="num">${soles(i.precio_unitario)}</td><td class="num">${soles(i.cantidad * i.precio_unitario)}</td></tr>`).join('') + '</tbody></table>';
+  abrir(`Cotización ${c.numero}`, html);
+}
+
+/* ---------------- usuarios (administrador) ---------------- */
+function dibujarUsuarios() {
+  const u = datos.usuarios || [];
+  $('contenido').innerHTML =
+    `<div class="barra"><button class="btn primario" id="btnNuevoUsuario">Nuevo usuario</button><button class="btn" id="btnClaveEdicion">Cambiar clave de edición</button></div>` +
+    '<div class="tabla">' + tabla(['Usuario', 'Nombre', 'Rol', 'Estado', ''], u.map((x) =>
+      `<tr><td><b>${esc(x.usuario)}</b></td><td>${esc(x.nombre)}</td><td>${esc(ROLES[x.rol] || x.rol)}</td><td>${x.activo ? '<span class="pildora p-conforme">Activo</span>' : '<span class="pildora p-gris">Desactivado</span>'}</td>` +
+      `<td class="num"><button class="btn" data-a="clave" data-id="${x.id}">Nueva clave</button> <button class="btn" data-a="activo" data-id="${x.id}">${x.activo ? 'Desactivar' : 'Activar'}</button></td></tr>`), 'Aún no hay usuarios.') + '</div>';
+  $('btnNuevoUsuario').addEventListener('click', formUsuario);
+  $('btnClaveEdicion').addEventListener('click', async () => {
+    const nueva = prompt('Nueva clave para editar documentos (mínimo 4 caracteres):');
+    if (!nueva) return;
+    try { await api('PUT', '/clave-edicion', { nueva }); alert('Clave de edición cambiada.'); } catch (e) { alert(e.message); }
+  });
+  $('contenido').querySelectorAll('button[data-a]').forEach((b) => b.addEventListener('click', async () => {
+    const id = Number(b.dataset.id), x = u.find((y) => y.id === id);
+    try {
+      if (b.dataset.a === 'clave') { const clave = prompt(`Nueva clave para ${x.usuario} (mínimo 6 caracteres):`); if (!clave) return; await api('PUT', '/usuarios/' + id, { clave }); alert('Clave cambiada.'); }
+      else { await api('PUT', '/usuarios/' + id, { activo: !x.activo }); }
+      datos.usuarios = await api('GET', '/usuarios'); dibujarUsuarios();
+    } catch (e) { alert(e.message); }
+  }));
+}
+
+function formUsuario() {
+  abrir('Nuevo usuario', `<form id="fU"><label class="campo">Usuario (sin espacios)<input id="uU" required pattern="[a-zA-Z0-9._-]{3,60}" autocapitalize="off"></label>
+    <label class="campo">Nombre completo<input id="uN" required></label>
+    <label class="campo">Clave (mínimo 6 caracteres)<input id="uC" type="text" required minlength="6"></label>
+    <label class="campo">Rol<select id="uR">${Object.entries(ROLES).map(([k, t]) => `<option value="${k}" ${k === 'empleado' ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    <div class="error" id="eU"></div><button class="btn primario" type="submit">Crear usuario</button></form>`);
+  $('fU').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api('POST', '/usuarios', { usuario: $('uU').value, nombre: $('uN').value, clave: $('uC').value, rol: $('uR').value });
+      $('detalle').close(); datos.usuarios = await api('GET', '/usuarios'); dibujarUsuarios();
+    } catch (err) { $('eU').textContent = err.message; }
+  });
+}
+
+/* ---------------- finanzas (caja diaria y caja chica) ---------------- */
+async function cargarFinanzas() {
+  try { datos.finanzas = await apiCaja('/caja/resumen'); datos.finanzasError = null; }
+  catch (e) { datos.finanzasError = e.message; }
+  if (pestana === 'finanzas') dibujarFinanzas();
+}
+const dia = (f) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(f || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : (f || '—'); };
+const NIVEL = { alta: 'p-urgente', media: 'p-pendiente', info: 'p-gris' };
+const ACCION = { crear: 'Registró', editar: 'Modificó', eliminar: 'Eliminó', cerrar: 'Cerró el día', reabrir: 'Reabrió el día', anular: 'Anuló', config: 'Cambió saldos iniciales', subir_foto: 'Agregó foto', quitar_foto: 'Quitó foto' };
+function dibujarFinanzas() {
+  const c = $('contenido');
+  if (datos.finanzasError) { c.innerHTML = `<div class="vacio">No se pudo cargar Finanzas: ${esc(datos.finanzasError)}</div>`; return; }
+  const f = datos.finanzas;
+  if (!f) { c.innerHTML = '<div class="vacio">Cargando…</div>'; return; }
+  const NOMBRE = { AQP: 'Arequipa', MOQ: 'Moquegua' };
+  const kpis = Object.entries(f.ciudades).map(([k, v]) => {
+    const h = v.hoy;
+    return `<div class="kpi"><b>${soles(v.caja.saldo)}</b><span>${NOMBRE[k] || k} · saldo de caja</span></div>` +
+      `<div class="kpi ${v.caja_chica.saldo < 0 ? 'alerta' : ''}"><b>${soles(v.caja_chica.saldo)}</b><span>${NOMBRE[k] || k} · caja chica</span></div>` +
+      `<div class="kpi"><b>${h ? h.movimientos : 0}</b><span>${NOMBRE[k] || k} · movimientos hoy${h && h.cierre ? ' (cerrado)' : ''}</span></div>`;
+  }).join('');
+  const al = f.alertas || {};
+  const alertas = (f.alertas_principales || []).map((a) =>
+    `<tr><td><span class="pildora ${NIVEL[a.nivel] || 'p-gris'}">${esc(a.nivel)}</span></td><td><b>${esc(a.titulo)}</b><br><small style="color:var(--suave)">${esc(a.detalle)}</small></td><td>${esc(NOMBRE[a.ciudad] || a.ciudad || '')}</td><td>${dia(a.fecha)}</td></tr>`);
+  const dias = Object.entries(f.ciudades).flatMap(([k, v]) => (v.ultimos_dias || []).map((d) => ({ ...d, ciudad: k })))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || a.ciudad.localeCompare(b.ciudad)).map((d) => {
+      const ci = d.cierre;
+      const estado = ci ? (ci.diferencia === 0 ? '<span class="pildora p-conforme">Cerrado · cuadra</span>' : `<span class="pildora p-urgente">Cerrado · ${ci.diferencia > 0 ? 'sobra' : 'falta'} ${soles(Math.abs(ci.diferencia))}</span>`) : '<span class="pildora p-gris">Sin cerrar</span>';
+      return `<tr><td>${dia(d.fecha)}</td><td>${esc(NOMBRE[d.ciudad] || d.ciudad)}</td><td class="num">${d.movimientos}</td><td class="num">${soles(d.ingresos)}</td><td class="num">${soles(d.salidas)}</td><td class="num">${soles(d.saldo_final_caja)}</td><td>${estado}${ci ? `<br><small style="color:var(--suave)">${esc(ci.cerrada_por || '')}</small>` : ''}</td></tr>`;
+    });
+  const cambios = (f.cambios_recientes || []).map((x) =>
+    `<tr><td>${fecha(x.creado_en)}</td><td>${esc(x.usuario || '—')}</td><td>${esc(ACCION[x.accion] || x.accion)} · ${esc(x.entidad)}</td><td>${esc(NOMBRE[x.ciudad] || x.ciudad || '')} ${x.fecha_dia ? dia(x.fecha_dia) : ''}${x.motivo ? '<br><small style="color:var(--suave)">' + esc(x.motivo) + '</small>' : ''}</td></tr>`);
+  c.innerHTML =
+    `<div class="tarjetas">${kpis}</div>` +
+    `<h3 style="margin:18px 0 8px">Alertas <small style="color:var(--suave)">(${al.alta || 0} altas · ${al.media || 0} medias)</small></h3>` +
+    '<div class="tabla">' + tabla(['Nivel', 'Detalle', 'Ciudad', 'Día'], alertas, 'Todo en orden: sin alertas.') + '</div>' +
+    '<h3 style="margin:18px 0 8px">Últimos días</h3>' +
+    '<div class="tabla">' + tabla(['Día', 'Ciudad', 'Mov.#', 'Ingresos#', 'Salidas#', 'Saldo caja#', 'Cierre'], dias, 'Aún no hay movimientos.') + '</div>' +
+    '<h3 style="margin:18px 0 8px">Cambios recientes</h3>' +
+    '<div class="tabla">' + tabla(['Cuándo', 'Quién', 'Qué', 'Día'], cambios, 'Sin cambios todavía.') + '</div>' +
+    '<p class="pie">Los movimientos se registran en <b>finanzas.icrenergy.tech</b>; aquí se ven en conjunto, igual que lo demás.</p>';
+}
+
+/* ---------------- bitácora ---------------- */
+function dibujarBitacora() {
+  const b = datos.bitacora || [];
+  $('contenido').innerHTML = '<div class="tabla">' + tabla(['Cuándo', 'Quién', 'Qué', 'Detalle'], b.map((x) =>
+    `<tr><td>${fecha(x.fecha)}</td><td>${esc(x.usuario || '—')}</td><td>${esc(x.accion)} · ${esc(x.tabla)}</td><td>${esc(x.detalle || '')}</td></tr>`), 'Todavía no hay movimientos.') + '</div>';
+}
+
+arrancar();
+</script>
+</body>
+</html>

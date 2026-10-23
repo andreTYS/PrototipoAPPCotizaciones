@@ -1,9 +1,9 @@
-name: Build Web (PWA)
+name: Build web
 
+# Arma la app web (PWA) lista para subir al VPS. Se lanza a mano desde la
+# pestaña Actions ("Run workflow") y deja un zip descargable.
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch: {}   # permite lanzarlo manualmente desde la pestaña Actions
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -15,20 +15,26 @@ jobs:
       - name: Instalar Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.3'
           channel: 'stable'
 
       - name: Instalar dependencias del proyecto
         run: flutter pub get
 
-      # --no-web-resources-cdn: la build queda sirviendo su propio CanvasKit
-      # en vez de bajarlo de Google en cada carga — importante para que la
-      # PWA funcione también con conexión limitada/filtrada en el celular
-      # del vendedor. Ver README.md "Build web / PWA".
-      - name: Compilar la build web (PWA)
-        run: flutter build web --release --no-web-resources-cdn
+      # --no-web-resources-cdn: la build queda sirviendo su propio CanvasKit en
+      # vez de bajarlo de Google en cada carga — importante para que la PWA
+      # funcione también con conexión limitada/filtrada en el celular del
+      # vendedor. --no-tree-shake-icons: necesario porque la app elige íconos
+      # en tiempo de ejecución (no son todos constantes conocidas en compile
+      # time), si no se agrega el build falla o deja íconos rotos.
+      - name: Compilar la app web
+        run: flutter build web --release --no-web-resources-cdn --no-tree-shake-icons
 
-      - name: Subir la build web como artefacto descargable
+      - name: Comprimir
+        run: cd build/web && zip -qr ../../cotizador-web.zip .
+
+      - name: Subir el zip como artefacto descargable
         uses: actions/upload-artifact@v4
         with:
-          name: cotizador-icr-web
-          path: build/web
+          name: cotizador-web
+          path: cotizador-web.zip

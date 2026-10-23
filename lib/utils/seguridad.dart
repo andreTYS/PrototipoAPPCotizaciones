@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../services/api_cliente.dart';
+import '../services/db_helper.dart';
 import '../theme/brand_colors.dart';
 
 /// Clave que se pide para editar cotizaciones, requerimientos y checklists
-/// ya registrados. Fija por ahora; si más adelante debe cambiarse o ser por
-/// usuario, este es el único lugar (y, con servidor, se valida allá).
+/// ya registrados. Sin servidor es fija (1234); con servidor la revisa la API
+/// (guardada cifrada) y se puede cambiar sin tocar la app.
 const claveEdicion = '1234';
 
 /// Pide la clave de edición. Devuelve true si se escribió bien, false si se
@@ -28,13 +30,24 @@ class _DialogoClave extends StatefulWidget {
 class _DialogoClaveState extends State<_DialogoClave> {
   final _controller = TextEditingController();
   String? _error;
+  bool _revisando = false;
 
-  void _confirmar() {
-    if (_controller.text.trim() == claveEdicion) {
-      Navigator.pop(context, true);
-    } else {
-      setState(() => _error = 'Clave incorrecta');
-      _controller.clear();
+  Future<void> _confirmar() async {
+    if (_revisando) return;
+    setState(() => _revisando = true);
+    try {
+      final correcta = await DbHelper.instance.verificarClaveEdicion(_controller.text);
+      if (!mounted) return;
+      if (correcta) {
+        Navigator.pop(context, true);
+      } else {
+        setState(() => _error = 'Clave incorrecta');
+        _controller.clear();
+      }
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.mensaje);
+    } finally {
+      if (mounted) setState(() => _revisando = false);
     }
   }
 

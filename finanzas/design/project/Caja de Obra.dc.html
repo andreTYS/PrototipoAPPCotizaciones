@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9EEF2;font-family:Manrope,system-ui,sans-serif;color:#0D2233;-webkit-font-smoothing:antialiased}
+a{color:#0E7490}a:hover{color:#124C8C}
+input,button{font-family:inherit}
+input:focus{outline:none;border-color:#0E7490 !important;box-shadow:0 0 0 3px rgba(14,116,144,.15)}
+@keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(125,255,214,.7)}70%{box-shadow:0 0 0 7px rgba(125,255,214,0)}100%{box-shadow:0 0 0 0 rgba(125,255,214,0)}}
+@keyframes scanLine{0%{top:0}50%{top:calc(100% - 3px)}100%{top:0}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes rowFlash{0%{background:#D8F3F4}100%{background:#fff}}
+::-webkit-scrollbar{width:0}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px;box-sizing:border-box">
+<div style="position:relative;width:390px;max-width:100%;height:812px;background:#F3F7F9;border-radius:32px;overflow:hidden;box-shadow:0 20px 60px rgba(13,34,51,.14),0 2px 6px rgba(13,34,51,.06)">
+
+<!-- HOME -->
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column">
+  <div style="flex:1;overflow-y:auto">
+    <div style="background:linear-gradient(160deg,#0E7490 0%,#12A3B8 100%);padding:24px 22px 78px;color:#fff">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px">A</div>
+          <div>
+            <div style="font-size:11.5px;opacity:.85">Hola,</div>
+            <div style="font-size:14px;font-weight:700">Adrián Alessandro</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:rgba(13,34,51,.22);font-size:10px;font-weight:800;letter-spacing:.08em">
+          <span style="width:7px;height:7px;border-radius:50%;background:#7DFFD6;animation:livePulse 1.8s infinite"></span>EN VIVO
+        </div>
+      </div>
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;opacity:.9">SALDO EN CUENTA</div>
+      <div style="font-size:36px;font-weight:800;letter-spacing:-.02em;margin:6px 0 4px;font-variant-numeric:tabular-nums">{{ balanceText }}</div>
+      <div style="font-size:12px;opacity:.85">Cuenta corriente •••• 4821 · {{ nowText }}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 18px;margin-top:-54px;position:relative">
+      <button onClick="{{ goIngreso }}" style="text-align:left;background:#fff;border:none;border-radius:18px;padding:16px;box-shadow:0 6px 20px rgba(13,34,51,.10);cursor:pointer;display:flex;flex-direction:column;gap:12px" style-active="transform:scale(.98)">
+        <div style="width:42px;height:42px;border-radius:12px;background:#0E7490;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700">+</div>
+        <div>
+          <div style="font-size:13px;font-weight:800;letter-spacing:.04em;color:#0D2233">INGRESO</div>
+          <div style="font-size:11.5px;color:#5B7285;margin-top:2px">Obra, venta u otro</div>
+        </div>
+      </button>
+      <button onClick="{{ goEgresoMetodo }}" style="text-align:left;background:#fff;border:none;border-radius:18px;padding:16px;box-shadow:0 6px 20px rgba(13,34,51,.10);cursor:pointer;display:flex;flex-direction:column;gap:12px" style-active="transform:scale(.98)">
+        <div style="width:42px;height:42px;border-radius:12px;background:#124C8C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700">−</div>
+        <div>
+          <div style="font-size:13px;font-weight:800;letter-spacing:.04em;color:#0D2233">EGRESO</div>
+          <div style="font-size:11.5px;color:#5B7285;margin-top:2px">Manual o con captura</div>
+        </div>
+      </button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 18px 0">
+      <div style="background:#D8F3F4;border-radius:14px;padding:12px 14px">
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#0E7490">INGRESOS · MES</div>
+        <div style="font-size:15px;font-weight:800;margin-top:4px;color:#0E7490">{{ monthIn }}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #E1E9EE;border-radius:14px;padding:12px 14px">
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285">EGRESOS · MES</div>
+        <div style="font-size:15px;font-weight:800;margin-top:4px;color:#B93A3A">{{ monthOut }}</div>
+      </div>
+    </div>
+
+    <div style="padding:22px 18px 28px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.1em">MOVIMIENTOS</div>
+        <div style="font-size:11.5px;color:#5B7285;white-space:nowrap">{{ movCount }}</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <sc-for list="{{ filters }}" as="f" hint-placeholder-count="3">
+          <button onClick="{{ f.pick }}" style="padding:8px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;background:{{ f.bg }};color:{{ f.color }};border:1px solid {{ f.border }}">{{ f.label }}</button>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border-radius:16px;border:1px solid #E1E9EE;overflow:hidden">
+        <sc-for list="{{ visibleMovs }}" as="m" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-top:1px solid {{ m.divider }};animation:{{ m.anim }}">
+            <div style="flex:none;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;background:{{ m.iconBg }};color:{{ m.iconColor }}">{{ m.sign }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.title }}</div>
+              <div style="font-size:11.5px;color:#5B7285;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.sub }}</div>
+            </div>
+            <div style="flex:none;font-size:13.5px;font-weight:800;font-variant-numeric:tabular-nums;color:{{ m.amountColor }}">{{ m.amountText }}</div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noMovs }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:28px 16px;text-align:center;font-size:12px;color:#5B7285">Aún no hay movimientos en este filtro.</div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- INGRESO FORM -->
+<sc-if value="{{ isIngreso }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;animation:fadeIn .2s">
+  <div style="flex:none;background:linear-gradient(160deg,#0E7490,#12A3B8);padding:20px 22px 22px;color:#fff">
+    <button onClick="{{ goHome }}" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:#fff;font-size:20px;cursor:pointer;margin-bottom:14px">‹</button>
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;opacity:.9">NUEVO REGISTRO</div>
+    <div style="font-size:24px;font-weight:800;margin-top:4px">Registrar ingreso</div>
+    <div style="font-size:12px;opacity:.85;margin-top:4px">Saldo actual {{ balanceText }}</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px 20px 24px;display:flex;flex-direction:column;gap:18px">
+    <div>
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">FECHA</div>
+      <input type="date" value="{{ ing.fecha }}" onChange="{{ ingFecha }}" style="width:100%;box-sizing:border-box;height:48px;border-radius:12px;border:1px solid #D5E0E8;background:#fff;padding:0 14px;font-size:14px;font-weight:600;color:#0D2233">
+      <sc-if value="{{ err.fecha }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.fecha }}</div></sc-if>
+    </div>
+    <div>
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">TIPO DE INGRESO</div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+        <sc-for list="{{ tipos }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.pick }}" style="height:46px;border-radius:12px;font-size:12.5px;font-weight:700;cursor:pointer;background:{{ t.bg }};color:{{ t.color }};border:1px solid {{ t.border }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+      <sc-if value="{{ err.tipo }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.tipo }}</div></sc-if>
+    </div>
+    <div>
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">DETALLE <span style="font-weight:600;letter-spacing:0;text-transform:none">(opcional)</span></div>
+      <input value="{{ ing.detalle }}" onChange="{{ ingDetalle }}" placeholder="{{ ingPlaceholder }}" style="width:100%;box-sizing:border-box;height:48px;border-radius:12px;border:1px solid #D5E0E8;background:#fff;padding:0 14px;font-size:14px;font-weight:600;color:#0D2233">
+    </div>
+    <div>
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">MONTO</div>
+      <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #D5E0E8;border-radius:14px;padding:6px 16px">
+        <div style="font-size:22px;font-weight:800;color:#0E7490">S/</div>
+        <input inputMode="decimal" value="{{ ing.monto }}" onChange="{{ ingMonto }}" placeholder="0.00" style="flex:1;min-width:0;border:none;background:transparent;height:52px;font-size:28px;font-weight:800;color:#0D2233;box-shadow:none">
+      </div>
+      <sc-if value="{{ err.monto }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.monto }}</div></sc-if>
+      <sc-if value="{{ ingPreview }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#0E7490;font-weight:700;margin-top:8px">Nuevo saldo: {{ ingPreview }}</div></sc-if>
+    </div>
+  </div>
+  <div style="flex:none;padding:14px 20px 22px;background:#fff;border-top:1px solid #E1E9EE;display:flex;flex-direction:column;gap:10px">
+    <button onClick="{{ reviewIngreso }}" style="height:54px;border-radius:14px;border:none;background:#0E7490;color:#fff;font-size:14px;font-weight:800;letter-spacing:.04em;cursor:pointer" style-hover="background:#0B6680">CONFIRMAR INGRESO</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- EGRESO METHOD -->
+<sc-if value="{{ isMetodo }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;animation:fadeIn .2s">
+  <div style="flex:none;background:#0D2233;padding:20px 22px 22px;color:#fff">
+    <button onClick="{{ goHome }}" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:20px;cursor:pointer;margin-bottom:14px">‹</button>
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;opacity:.75">NUEVO REGISTRO</div>
+    <div style="font-size:24px;font-weight:800;margin-top:4px">Registrar egreso</div>
+    <div style="font-size:12px;opacity:.75;margin-top:4px">¿Cómo quieres registrarlo?</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:22px 20px;display:flex;flex-direction:column;gap:14px">
+    <button onClick="{{ goManual }}" style="text-align:left;display:flex;align-items:center;gap:14px;background:#D8F3F4;border:none;border-radius:18px;padding:18px;cursor:pointer" style-hover="background:#CBEEF0">
+      <div style="flex:none;width:52px;height:52px;border-radius:14px;background:#0E7490;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;letter-spacing:.06em">ABC</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.03em">REGISTRO MANUAL</div>
+        <div style="font-size:12px;color:#44606F;margin-top:3px">Completa el formulario con los datos del gasto</div>
+      </div>
+      <div style="font-size:12.5px;font-weight:800;color:#0E7490">›</div>
+    </button>
+    <button onClick="{{ goCaptura }}" style="text-align:left;display:flex;align-items:center;gap:14px;background:#D8F3F4;border:none;border-radius:18px;padding:18px;cursor:pointer" style-hover="background:#CBEEF0">
+      <div style="flex:none;width:52px;height:52px;border-radius:14px;background:#124C8C;display:flex;align-items:center;justify-content:center">
+        <div style="width:22px;height:18px;border:2.5px solid #fff;border-radius:5px;display:flex;align-items:center;justify-content:center"><div style="width:7px;height:7px;border-radius:50%;background:#fff"></div></div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.03em">CON CAPTURA</div>
+        <div style="font-size:12px;color:#44606F;margin-top:3px">Sube una foto del comprobante y llenamos el formulario por ti</div>
+      </div>
+      <div style="font-size:12.5px;font-weight:800;color:#0E7490">›</div>
+    </button>
+    <div style="font-size:11.5px;color:#5B7285;text-align:center;margin-top:6px;text-wrap:pretty">En ambos casos podrás revisar y confirmar antes de registrar.</div>
+  </div>
+</div>
+</sc-if>
+
+<!-- CAPTURA -->
+<sc-if value="{{ isCaptura }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;animation:fadeIn .2s">
+  <div style="flex:none;background:#0D2233;padding:20px 22px 22px;color:#fff">
+    <button onClick="{{ goEgresoMetodoFromCap }}" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:20px;cursor:pointer;margin-bottom:14px">‹</button>
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;opacity:.75">EGRESO · CAPTURA</div>
+    <div style="font-size:24px;font-weight:800;margin-top:4px">Sube tu comprobante</div>
+    <div style="font-size:12px;opacity:.75;margin-top:4px">Boleta, factura, voucher o captura de transferencia</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:22px 20px;display:flex;flex-direction:column;gap:16px">
+    <sc-if value="{{ capIdle }}" hint-placeholder-val="{{ true }}">
+      <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;height:340px;border-radius:18px;border:1.5px dashed #9FB6C3;background:repeating-linear-gradient(135deg,#EEF3F6 0 10px,#E6EDF1 10px 20px);cursor:pointer;text-align:center">
+        <input type="file" accept="image/*" onChange="{{ onFile }}" style="display:none">
+        <div style="width:56px;height:56px;border-radius:16px;background:#124C8C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700">↑</div>
+        <div style="font-size:14px;font-weight:800">Toca para subir una foto</div>
+        <div style="font-size:11.5px;color:#5B7285;max-width:220px">JPG o PNG. Asegúrate de que el monto y la fecha se lean bien.</div>
+      </label>
+      <button onClick="{{ useSample }}" style="height:50px;border-radius:14px;border:1.5px solid #124C8C;background:#fff;color:#124C8C;font-size:13.5px;font-weight:800;cursor:pointer">Probar con comprobante de ejemplo</button>
+    </sc-if>
+    <sc-if value="{{ capBusy }}" hint-placeholder-val="{{ false }}">
+      <div style="position:relative;height:340px;border-radius:18px;overflow:hidden;background:#0D2233">
+        {{ capPreview }}
+        <sc-if value="{{ capNoImg }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:24px 60px;background:repeating-linear-gradient(135deg,#F3F7F9 0 10px,#E6EDF1 10px 20px);border-radius:8px;display:flex;align-items:center;justify-content:center;font:11px ui-monospace,Menlo,monospace;color:#5B7285">comprobante de ejemplo</div>
+        </sc-if>
+        <div style="position:absolute;left:0;right:0;height:3px;background:#7DFFD6;box-shadow:0 0 16px 4px rgba(125,255,214,.6);animation:scanLine 2s ease-in-out infinite"></div>
+      </div>
+      <div style="background:#fff;border:1px solid #E1E9EE;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.1em">ANALIZANDO COMPROBANTE…</div>
+        <sc-for list="{{ capSteps }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:600;color:{{ s.color }}">
+            <div style="width:18px;height:18px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;background:{{ s.dot }}">{{ s.mark }}</div>{{ s.label }}
+          </div>
+        </sc-for>
+      </div>
+      <button onClick="{{ cancelCapture }}" style="height:50px;border-radius:14px;border:1.5px solid #B93A3A;background:#fff;color:#B93A3A;font-size:13.5px;font-weight:800;cursor:pointer">Cancelar</button>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<!-- EGRESO FORM -->
+<sc-if value="{{ isEgreso }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;animation:fadeIn .2s">
+  <div style="flex:none;background:#0D2233;padding:20px 22px 22px;color:#fff">
+    <button onClick="{{ backFromEgreso }}" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:20px;cursor:pointer;margin-bottom:14px">‹</button>
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;opacity:.75">{{ egrKicker }}</div>
+    <div style="font-size:24px;font-weight:800;margin-top:4px">Datos del egreso</div>
+    <div style="font-size:12px;opacity:.75;margin-top:4px">Saldo actual {{ balanceText }}</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:18px 20px 24px;display:flex;flex-direction:column;gap:16px">
+    <sc-if value="{{ fromCapture }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:12px;align-items:center;background:#D8F3F4;border-radius:14px;padding:12px;animation:fadeUp .3s">
+        <div style="flex:none;width:46px;height:56px;border-radius:8px;overflow:hidden;background:repeating-linear-gradient(135deg,#F3F7F9 0 6px,#E6EDF1 6px 12px)">
+          {{ capThumb }}
+        </div>
+        <div style="flex:1;font-size:12px;color:#0D2233;line-height:1.4"><b style="font-weight:800">Datos detectados automáticamente.</b> Revisa y corrige lo que sea necesario.</div>
+      </div>
+    </sc-if>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">FECHA<sc-if value="{{ auto.fecha }}" hint-placeholder-val="{{ false }}"><span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#D8F3F4;color:#0E7490">AUTO</span></sc-if></div>
+        <input type="date" value="{{ egr.fecha }}" onChange="{{ egrF.fecha }}" style="width:100%;box-sizing:border-box;height:48px;border-radius:12px;border:1px solid #D5E0E8;background:#fff;padding:0 10px;font-size:13.5px;font-weight:600;color:#0D2233">
+        <sc-if value="{{ err.fecha }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.fecha }}</div></sc-if>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">CIUDAD<sc-if value="{{ auto.ciudad }}" hint-placeholder-val="{{ false }}"><span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#D8F3F4;color:#0E7490">AUTO</span></sc-if></div>
+        <input list="ciudades" value="{{ egr.ciudad }}" onChange="{{ egrF.ciudad }}" placeholder="Ej. Lima" style="width:100%;box-sizing:border-box;height:48px;border-radius:12px;border:1px solid #D5E0E8;background:#fff;padding:0 12px;font-size:14px;font-weight:600;color:#0D2233">
+        <datalist id="ciudades"><option value="Lima"></option><option value="Arequipa"></option><option value="Trujillo"></option><option value="Cusco"></option><option value="Piura"></option><option value="Chiclayo"></option></datalist>
+        <sc-if value="{{ err.ciudad }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.ciudad }}</div></sc-if>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">PERSONA<sc-if value="{{ auto.persona }}" hint-placeholder-val="{{ false }}"><span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#D8F3F4;color:#0E7490">AUTO</span></sc-if></div>
+      <input value="{{ egr.persona }}" onChange="{{ egrF.persona }}" placeholder="¿A quién se pagó?" style="width:100%;box-sizing:border-box;height:48px;border-radius:12px;border:1px solid #D5E0E8;background:#fff;padding:0 14px;font-size:14px;font-weight:600;color:#0D2233">
+      <sc-if value="{{ err.persona }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.persona }}</div></sc-if>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">DESCRIPCIÓN<sc-if value="{{ auto.desc }}" hint-placeholder-val="{{ false }}"><span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#D8F3F4;color:#0E7490">AUTO</span></sc-if></div>
+      <input value="{{ egr.desc }}" onChange="{{ egrF.desc }}" placeholder="Ej. Compra de cemento para losa" style="width:100%;box-sizing:border-box;height:48px;border-radius:12px;border:1px solid #D5E0E8;background:#fff;padding:0 14px;font-size:14px;font-weight:600;color:#0D2233">
+      <sc-if value="{{ err.desc }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.desc }}</div></sc-if>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">CATEGORÍA<sc-if value="{{ auto.categoria }}" hint-placeholder-val="{{ false }}"><span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#D8F3F4;color:#0E7490">AUTO</span></sc-if></div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+          <button onClick="{{ c.pick }}" style="height:42px;border-radius:11px;font-size:11.5px;font-weight:700;cursor:pointer;padding:0 4px;background:{{ c.bg }};color:{{ c.color }};border:1px solid {{ c.border }}">{{ c.label }}</button>
+        </sc-for>
+      </div>
+      <sc-if value="{{ err.categoria }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.categoria }}</div></sc-if>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:#5B7285;margin-bottom:8px">MONTO<sc-if value="{{ auto.monto }}" hint-placeholder-val="{{ false }}"><span style="font-size:9px;padding:2px 6px;border-radius:5px;background:#D8F3F4;color:#0E7490">AUTO</span></sc-if></div>
+      <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #D5E0E8;border-radius:14px;padding:6px 16px">
+        <div style="font-size:22px;font-weight:800;color:#124C8C">S/</div>
+        <input inputMode="decimal" value="{{ egr.monto }}" onChange="{{ egrF.monto }}" placeholder="0.00" style="flex:1;min-width:0;border:none;background:transparent;height:52px;font-size:28px;font-weight:800;color:#0D2233;box-shadow:none">
+      </div>
+      <sc-if value="{{ err.monto }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#B93A3A;margin-top:6px">{{ err.monto }}</div></sc-if>
+      <sc-if value="{{ egrPreview }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;font-weight:700;margin-top:8px;color:{{ egrPreviewColor }}">Nuevo saldo: {{ egrPreview }}</div></sc-if>
+    </div>
+  </div>
+  <div style="flex:none;padding:14px 20px 22px;background:#fff;border-top:1px solid #E1E9EE">
+    <button onClick="{{ reviewEgreso }}" style="width:100%;height:54px;border-radius:14px;border:none;background:#0E7490;color:#fff;font-size:14px;font-weight:800;letter-spacing:.04em;cursor:pointer" style-hover="background:#0B6680">CONFIRMAR EGRESO</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- CONFIRM SHEET -->
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(13,34,51,.5);display:flex;flex-direction:column;justify-content:flex-end;animation:fadeIn .2s;z-index:5">
+  <div onClick="{{ closeSheet }}" style="flex:1"></div>
+  <div style="background:#fff;border-radius:26px 26px 0 0;padding:10px 22px 24px;animation:sheetUp .28s cubic-bezier(.2,.8,.2,1)">
+    <div style="width:40px;height:4px;border-radius:4px;background:#D5E0E8;margin:0 auto 18px"></div>
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;color:#5B7285">{{ sheetKicker }}</div>
+    <div style="font-size:30px;font-weight:800;margin:6px 0 16px;font-variant-numeric:tabular-nums;color:{{ sheetAmountColor }}">{{ sheetAmount }}</div>
+    <div style="border:1px solid #E1E9EE;border-radius:14px;overflow:hidden;margin-bottom:14px">
+      <sc-for list="{{ sheetRows }}" as="r" hint-placeholder-count="4">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:11px 14px;font-size:12.5px;border-top:1px solid {{ r.divider }}">
+          <span style="color:#5B7285">{{ r.k }}</span><span style="font-weight:700;text-align:right">{{ r.v }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#F3F7F9;border-radius:12px;padding:12px 14px;margin-bottom:18px">
+      <span style="font-size:12px;color:#5B7285">Saldo después del registro</span>
+      <span style="font-size:14px;font-weight:800">{{ sheetNewBal }}</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button onClick="{{ confirmRegister }}" style="height:54px;border-radius:14px;border:none;background:#0E7490;color:#fff;font-size:14px;font-weight:800;letter-spacing:.04em;cursor:pointer" style-hover="background:#0B6680">{{ sheetCta }}</button>
+      <button onClick="{{ closeSheet }}" style="height:50px;border-radius:14px;border:1.5px solid #124C8C;background:#fff;color:#124C8C;font-size:13.5px;font-weight:800;cursor:pointer">Volver a editar</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- SUCCESS TOAST -->
+<sc-if value="{{ success }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:18px;right:18px;top:18px;z-index:6;background:#0D2233;color:#fff;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 10px 30px rgba(13,34,51,.3);animation:fadeUp .3s">
+  <div style="flex:none;width:34px;height:34px;border-radius:50%;background:#7DFFD6;color:#0D2233;display:flex;align-items:center;justify-content:center;font-weight:800">✓</div>
+  <div style="flex:1">
+    <div style="font-size:13px;font-weight:800">{{ success.title }}</div>
+    <div style="font-size:11.5px;opacity:.8;margin-top:2px">{{ success.sub }}</div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const CATS=['Equipos','Caja chica','Movilidad','Material','Sueldo','Oficina','Fletes','Viáticos'];
+const TIPOS=['Obra / Proyecto','Venta','Otro'];
+const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const KEY='cajaobra.v1';
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+const daysAgo=k=>{const d=new Date();d.setDate(d.getDate()-k);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+const money=n=>'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fdate=s=>{if(!s)return '';const [y,m,d]=s.split('-');return +d+' '+MESES[+m-1]+' '+y;};
+const num=v=>parseFloat(String(v).replace(/,/g,''))||0;
+const cleanAmt=v=>{v=String(v).replace(/[^\d.]/g,'');const i=v.indexOf('.');if(i>-1)v=v.slice(0,i+1)+v.slice(i+1).replace(/\./g,'').slice(0,2);return v;};
+const SAMPLES=[
+ {persona:'Ferretería El Constructor SAC',desc:'Cemento Portland x 40 bolsas',ciudad:'Lima',categoria:'Material',monto:'1240.00'},
+ {persona:'Transportes Rímac EIRL',desc:'Flete de agregados a obra',ciudad:'Lima',categoria:'Fletes',monto:'680.00'},
+ {persona:'Grifo Santa Rosa',desc:'Combustible camioneta de obra',ciudad:'Arequipa',categoria:'Movilidad',monto:'215.50'},
+ {persona:'Alquileres Maq. Andina',desc:'Alquiler de mezcladora 3 días',ciudad:'Trujillo',categoria:'Equipos',monto:'450.00'}];
+const SEED={balance:48250,movs:[
+ {id:1,kind:'in',title:'Torre Aurora — Etapa 2',cat:'Obra / Proyecto',date:daysAgo(1),amount:12500},
+ {id:2,kind:'out',title:'Fierro corrugado 1/2"',cat:'Material',date:daysAgo(2),amount:3480,persona:'Aceros del Sur',ciudad:'Lima'},
+ {id:3,kind:'out',title:'Planilla quincenal',cat:'Sueldo',date:daysAgo(4),amount:6200,persona:'Personal de obra',ciudad:'Lima'},
+ {id:4,kind:'in',title:'Venta de excedente de ladrillo',cat:'Venta',date:daysAgo(6),amount:1850}]};
+const emptyIng=()=>({fecha:today(),tipo:'',detalle:'',monto:''});
+const emptyEgr=()=>({fecha:today(),persona:'',desc:'',ciudad:'',categoria:'',monto:''});
+const load=()=>{try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&typeof s.balance==='number')return s;}catch(e){}return SEED;};
+
+class Component extends DCLogic{
+  state=(()=>{const s=load();return{screen:'home',balance:s.balance,display:s.balance,movs:s.movs,ing:emptyIng(),egr:emptyEgr(),err:{},sheet:null,cap:{status:'idle',url:null,step:0},fromCapture:false,autoVals:{},success:null,filter:'Todos',hlId:null,now:new Date()};})();
+  componentDidMount(){if(this.state.cap&&this.state.cap.status==='busy'&&this.job!==this.state.cap.job)this.setState({cap:{status:'idle',url:null,step:0}});this.tick=setInterval(()=>this.setState({now:new Date()}),1000);}
+  componentWillUnmount(){clearInterval(this.tick);(this.timers||[]).forEach(clearTimeout);cancelAnimationFrame(this.raf);}
+  later(fn,ms){(this.timers=this.timers||[]).push(setTimeout(fn,ms));}
+  go(screen){this.setState({screen,err:{}});}
+  tween(from,to){cancelAnimationFrame(this.raf);const t0=performance.now(),D=1100;const step=t=>{const p=Math.min(1,(t-t0)/D),e=1-Math.pow(1-p,3);this.setState({display:from+(to-from)*e});if(p<1)this.raf=requestAnimationFrame(step);};this.raf=requestAnimationFrame(step);}
+  setIng(k,v){this.setState(s=>({ing:{...s.ing,[k]:v},err:{...s.err,[k]:null}}));}
+  setEgr(k,v){this.setState(s=>({egr:{...s.egr,[k]:v},err:{...s.err,[k]:null}}));}
+  reviewIngreso(){const i=this.state.ing,err={};if(!i.fecha)err.fecha='Selecciona la fecha';if(!i.tipo)err.tipo='Elige el tipo de ingreso';if(num(i.monto)<=0)err.monto='Ingresa un monto mayor a 0';if(Object.keys(err).length)return this.setState({err});this.setState({sheet:'in'});}
+  reviewEgreso(){const e=this.state.egr,err={};if(!e.fecha)err.fecha='Selecciona la fecha';if(!e.ciudad.trim())err.ciudad='Indica la ciudad';if(!e.persona.trim())err.persona='Indica la persona';if(!e.desc.trim())err.desc='Agrega una descripción';if(!e.categoria)err.categoria='Elige una categoría';if(num(e.monto)<=0)err.monto='Ingresa un monto mayor a 0';if(Object.keys(err).length)return this.setState({err});this.setState({sheet:'out'});}
+  confirm(){const s=this.state,kind=s.sheet,id=Date.now();let mov,amt;
+    if(kind==='in'){amt=num(s.ing.monto);mov={id,kind,title:s.ing.detalle.trim()||s.ing.tipo,cat:s.ing.tipo,date:s.ing.fecha,amount:amt};}
+    else{amt=num(s.egr.monto);mov={id,kind,title:s.egr.desc.trim(),cat:s.egr.categoria,date:s.egr.fecha,amount:amt,persona:s.egr.persona,ciudad:s.egr.ciudad,captura:s.fromCapture};}
+    const from=s.balance,to=+(from+(kind==='in'?amt:-amt)).toFixed(2),movs=[mov,...s.movs];
+    try{localStorage.setItem(KEY,JSON.stringify({balance:to,movs}));}catch(e){}
+    this.setState({screen:'home',sheet:null,balance:to,display:from,movs,hlId:id,filter:'Todos',ing:emptyIng(),egr:emptyEgr(),err:{},fromCapture:false,autoVals:{},cap:{status:'idle',url:null,step:0},
+      success:{title:kind==='in'?'Ingreso registrado':'Egreso registrado',sub:(kind==='in'?'+':'−')+money(amt)+' · saldo actualizado'}});
+    this.later(()=>this.tween(from,to),250);this.later(()=>this.setState({success:null}),2600);this.later(()=>this.setState({hlId:null}),3000);}
+  startCapture(url,seed){const job=Date.now();this.job=job;this.setState({cap:{status:'busy',url,step:0,job}});
+    const run=k=>{if(this.job!==job)return;
+      if(k<=4){this.setState(s=>({cap:{...s.cap,step:k}}));window.setTimeout(()=>run(k+1),k===4?400:650);}
+      else{const d={...SAMPLES[seed%SAMPLES.length],fecha:today()};this.setState({egr:d,autoVals:{...d},fromCapture:true,screen:'egreso',err:{}});}};
+    window.setTimeout(()=>run(1),650);}
+  cancelCapture(){this.job=null;this.setState({cap:{status:'idle',url:null,step:0}});}
+  renderVals(){const s=this.state,S=this;
+    const chip=(label,active,pick)=>({label,pick,bg:active?'#0D2233':'#fff',color:active?'#fff':'#0D2233',border:active?'#0D2233':'#D5E0E8'});
+    const opt=(label,active,pick)=>({label,pick,bg:active?'#0E7490':'#fff',color:active?'#fff':'#0D2233',border:active?'#0E7490':'#D5E0E8'});
+    const ym=today().slice(0,7);
+    const monthIn=s.movs.filter(m=>m.kind==='in'&&m.date.slice(0,7)===ym).reduce((a,m)=>a+m.amount,0);
+    const monthOut=s.movs.filter(m=>m.kind==='out'&&m.date.slice(0,7)===ym).reduce((a,m)=>a+m.amount,0);
+    const list=s.movs.filter(m=>s.filter==='Todos'||(s.filter==='Ingresos'?m.kind==='in':m.kind==='out'));
+    const visibleMovs=list.map((m,i)=>({title:m.title,sub:m.cat+' · '+fdate(m.date)+(m.persona?' · '+m.persona:''),sign:m.kind==='in'?'+':'−',
+      iconBg:m.kind==='in'?'#D8F3F4':'#E4ECF5',iconColor:m.kind==='in'?'#0E7490':'#124C8C',amountColor:m.kind==='in'?'#0E7490':'#B93A3A',
+      amountText:(m.kind==='in'?'+':'−')+money(m.amount),divider:i?'#EEF3F6':'transparent',anim:m.id===s.hlId?'rowFlash 2.4s ease-out':'none'}));
+    const e=s.egr,av=s.autoVals,ft=s.fromCapture;
+    const auto={};['fecha','persona','desc','ciudad','categoria','monto'].forEach(k=>auto[k]=ft&&av[k]!==undefined&&av[k]===e[k]);
+    const egrF={};['fecha','persona','desc','ciudad'].forEach(k=>egrF[k]=ev=>S.setEgr(k,ev.target.value));egrF.monto=ev=>S.setEgr('monto',cleanAmt(ev.target.value));
+    const iAmt=num(s.ing.monto),eAmt=num(e.monto);
+    const ref=s.balance;
+    let sheetRows=[];
+    if(s.sheet==='in')sheetRows=[['Fecha',fdate(s.ing.fecha)],['Tipo',s.ing.tipo],...(s.ing.detalle.trim()?[['Detalle',s.ing.detalle.trim()]]:[])];
+    if(s.sheet==='out')sheetRows=[['Fecha',fdate(e.fecha)],['Persona',e.persona],['Descripción',e.desc],['Ciudad',e.ciudad],['Categoría',e.categoria],['Origen',ft?'Captura de pantalla':'Manual']];
+    const stepLabels=['Leyendo imagen','Detectando monto y fecha','Identificando proveedor','Sugiriendo categoría'];
+    const nowText='Actualizado '+pad(s.now.getHours())+':'+pad(s.now.getMinutes())+':'+pad(s.now.getSeconds());
+    return{
+      isHome:s.screen==='home',isIngreso:s.screen==='ingreso',isMetodo:s.screen==='metodo',isCaptura:s.screen==='captura',isEgreso:s.screen==='egreso',
+      balanceText:money(s.display),nowText,monthIn:money(monthIn),monthOut:money(monthOut),movCount:s.movs.length+' registros',
+      filters:['Todos','Ingresos','Egresos'].map(f=>chip(f,s.filter===f,()=>S.setState({filter:f}))),
+      visibleMovs,noMovs:!visibleMovs.length,
+      goHome:()=>S.go('home'),goIngreso:()=>S.setState({screen:'ingreso',ing:emptyIng(),err:{}}),goEgresoMetodo:()=>S.setState({screen:'metodo',cap:{status:'idle',url:null,step:0}}),
+      goManual:()=>S.setState({screen:'egreso',egr:emptyEgr(),fromCapture:false,autoVals:{},err:{}}),goCaptura:()=>S.go('captura'),
+      backFromEgreso:()=>S.setState({screen:ft?'captura':'metodo',cap:{status:'idle',url:null,step:0}}),
+      ing:s.ing,err:s.err,
+      ingFecha:ev=>S.setIng('fecha',ev.target.value),ingDetalle:ev=>S.setIng('detalle',ev.target.value),ingMonto:ev=>S.setIng('monto',cleanAmt(ev.target.value)),
+      ingPlaceholder:s.ing.tipo==='Venta'?'Ej. Venta de material sobrante':s.ing.tipo==='Otro'?'Ej. Devolución de garantía':'Ej. Torre Aurora — Etapa 2',
+      tipos:TIPOS.map(t=>opt(t,s.ing.tipo===t,()=>S.setIng('tipo',t))),
+      ingPreview:iAmt>0?money(ref+iAmt):'',
+      reviewIngreso:()=>S.reviewIngreso(),reviewEgreso:()=>S.reviewEgreso(),
+      egr:e,egrF,auto,fromCapture:ft,egrKicker:ft?'EGRESO · DESDE CAPTURA':'EGRESO · MANUAL',
+      cats:CATS.map(c=>opt(c,e.categoria===c,()=>S.setEgr('categoria',c))),
+      egrPreview:eAmt>0?money(ref-eAmt):'',egrPreviewColor:ref-eAmt<0?'#B93A3A':'#124C8C',
+      capPreview:s.cap.url?React.createElement('img',{src:s.cap.url,alt:'Comprobante',style:{width:'100%',height:'100%',objectFit:'contain',opacity:.85}}):null,
+      capThumb:s.cap.url?React.createElement('img',{src:s.cap.url,alt:'',style:{width:'100%',height:'100%',objectFit:'cover'}}):null,cancelCapture:()=>S.cancelCapture(),
+      goEgresoMetodoFromCap:()=>{S.job=null;S.setState({screen:'metodo',cap:{status:'idle',url:null,step:0}});},
+      cap:s.cap,capIdle:s.cap.status==='idle',capBusy:s.cap.status==='busy',capNoImg:s.cap.status==='busy'&&!s.cap.url,
+      capSteps:stepLabels.map((l,i)=>{const done=s.cap.step>i,cur=s.cap.step===i;return{label:l,mark:done?'✓':'',color:done||cur?'#0D2233':'#9FB6C3',dot:done?'#0E7490':cur?'#12A3B8':'#D5E0E8'};}),
+      onFile:ev=>{const f=ev.target.files&&ev.target.files[0];if(!f)return;let h=0;for(const ch of f.name)h=(h*31+ch.charCodeAt(0))>>>0;S.startCapture(URL.createObjectURL(f),h);},
+      useSample:()=>S.startCapture(null,Math.floor(Math.random()*4)),
+      sheetOpen:!!s.sheet,closeSheet:()=>S.setState({sheet:null}),confirmRegister:()=>S.confirm(),
+      sheetKicker:s.sheet==='in'?'CONFIRMA TU INGRESO':'CONFIRMA TU EGRESO',
+      sheetAmount:s.sheet==='in'?'+'+money(iAmt):'−'+money(eAmt),sheetAmountColor:s.sheet==='in'?'#0E7490':'#B93A3A',
+      sheetRows:sheetRows.map(([k,v],i)=>({k,v,divider:i?'#EEF3F6':'transparent'})),
+      sheetNewBal:money(s.sheet==='in'?ref+iAmt:ref-eAmt),sheetCta:s.sheet==='in'?'REGISTRAR INGRESO':'REGISTRAR EGRESO',
+      success:s.success};
+  }
+}
+</script>
+</body>
+</html>

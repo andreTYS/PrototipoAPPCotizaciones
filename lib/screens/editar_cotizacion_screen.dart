@@ -198,6 +198,7 @@ class _EditarCotizacionScreenState extends State<EditarCotizacionScreen> {
         fecha: c.fecha,
         total: _total,
         archivoPdf: c.archivoPdf,
+        version: c.version,
         items: [
           for (final l in _lineas)
             ItemCotizacionGuardado(

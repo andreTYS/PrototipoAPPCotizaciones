@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../services/db_helper.dart';
 import '../state/almacen_state.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
@@ -41,7 +42,9 @@ class AlmacenScreen extends StatelessWidget {
                   children: [
                     _BotonAlmacen(
                       titulo: 'Requerimientos',
-                      subtitulo: 'Pide materiales para una obra.\nLos aprueba el jefe de obra con su código.',
+                      subtitulo: DbHelper.instance.esServidor
+                          ? 'Pide materiales para una obra.\nLos aprueba un encargado y los alista almacén.'
+                          : 'Pide materiales para una obra.\nLos aprueba el jefe de obra con su código.',
                       icono: Icons.assignment_outlined,
                       colores: const [BrandColors.azulOscuro, BrandColors.azulMarino],
                       contador: porAprobar == 1 ? '1 por aprobar' : '$porAprobar por aprobar',

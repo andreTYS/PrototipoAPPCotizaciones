@@ -36,12 +36,9 @@ class Requerimiento {
   final String? observaciones;
   final String categoriasJson;
 
-  /// Control de versión optimista de la API compartida — null para los
-  /// requerimientos que todavía viven solo en la base local del
-  /// dispositivo (DbHelper no la usa). Cada acción contra la API manda
-  /// esta versión, y si ya no coincide es porque otro dispositivo lo
-  /// cambió primero (409 CONFLICTO_VERSION, nunca se pisa en silencio).
-  final int? version;
+  /// Con servidor: la versión del registro cuando se leyó. Si otra persona lo
+  /// cambia en el medio, el servidor avisa en vez de pisar su cambio.
+  final int version;
 
   Requerimiento({
     this.id,
@@ -59,7 +56,7 @@ class Requerimiento {
     this.recibidoPor,
     this.observaciones,
     required this.categoriasJson,
-    this.version,
+    this.version = 0,
   });
 
   late final List<ChecklistCategoriaState> categorias = soloMarcados(categoriasDesdeJson(categoriasJson));
@@ -107,14 +104,11 @@ class Requerimiento {
     String? alistadoPor,
     DateTime? fechaEntrega,
     String? recibidoPor,
-    // Solo lo usa AlmacenState, para guardar de vuelta el reserva_id/
-    // prestamo_id de cada ítem después de sincronizar con el ERP.
     String? categoriasJson,
     String? obra,
     String? solicitante,
     bool? urgente,
     String? observaciones,
-    int? version,
   }) {
     return Requerimiento(
       id: id ?? this.id,
@@ -132,7 +126,7 @@ class Requerimiento {
       recibidoPor: recibidoPor ?? this.recibidoPor,
       observaciones: observaciones ?? this.observaciones,
       categoriasJson: categoriasJson ?? this.categoriasJson,
-      version: version ?? this.version,
+      version: version,
     );
   }
 
@@ -156,58 +150,6 @@ class Requerimiento {
     );
   }
 
-  /// Reconstruye un requerimiento desde la respuesta de la API compartida
-  /// (requerimientos.php): normaliza sus "items" planos (uno por material,
-  /// con 'categoria' propia) a la misma forma [categoriasJson] que ya usan
-  /// toda la pantalla de detalle y el PDF, agrupando por categoría en el
-  /// orden en que aparecen. Así el resto del código no se entera de si el
-  /// requerimiento vino de la base local o de la API.
-  factory Requerimiento.fromApiMap(Map<String, dynamic> map) {
-    final itemsApi = (map['items'] as List<dynamic>? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-    final categorias = <String, List<ChecklistItemEntry>>{};
-    for (final item in itemsApi) {
-      final categoria = (item['categoria'] ?? '').toString();
-      (categorias[categoria] ??= []).add(ChecklistItemEntry(
-        texto: (item['nombre'] ?? '').toString(),
-        cantidad: (item['cantidad'] as num?)?.toInt() ?? 0,
-        esExtra: item['es_extra'] == 1 || item['es_extra'] == true,
-        esProducto: item['es_producto'] == 1 || item['es_producto'] == true,
-        unidad: item['unidad'] as String?,
-        precio: (item['precio_unitario'] as num?)?.toDouble(),
-        alistado: item['alistado'] == null ? null : (item['alistado'] == 1 || item['alistado'] == true),
-        alistadoPor: item['alistado_por'] as String?,
-        fechaAlistado: DateTime.tryParse((item['fecha_alistado'] ?? '').toString()),
-        apiItemId: (item['id'] as num?)?.toInt(),
-      ));
-    }
-    final categoriasJson = categoriasAJson([
-      for (final entry in categorias.entries) ChecklistCategoriaState(nombre: entry.key, items: entry.value),
-    ]);
-    return Requerimiento(
-      id: map['id'] as int?,
-      numero: (map['numero'] ?? '').toString(),
-      obra: (map['obra'] ?? '').toString(),
-      solicitante: (map['solicitante'] ?? '').toString(),
-      urgente: map['urgente'] == 1 || map['urgente'] == true,
-      estado: EstadoRequerimiento.values.firstWhere(
-        (e) => e.name == map['estado'],
-        orElse: () => EstadoRequerimiento.pendiente,
-      ),
-      fechaCreacion: DateTime.parse(map['fecha_creacion'] as String),
-      fechaAprobacion: DateTime.tryParse((map['fecha_aprobacion'] ?? '').toString()),
-      aprobadoPor: map['aprobado_por'] as String?,
-      fechaListo: DateTime.tryParse((map['fecha_listo'] ?? '').toString()),
-      alistadoPor: map['alistado_por'] as String?,
-      fechaEntrega: DateTime.tryParse((map['fecha_entrega'] ?? '').toString()),
-      recibidoPor: map['recibido_por'] as String?,
-      observaciones: map['observaciones'] as String?,
-      categoriasJson: categoriasJson,
-      version: (map['version'] as num?)?.toInt(),
-    );
-  }
-
   factory Requerimiento.fromMap(Map<String, dynamic> map) {
     return Requerimiento(
       id: map['id'] as int?,
@@ -228,6 +170,7 @@ class Requerimiento {
       recibidoPor: map['recibido_por'] as String?,
       observaciones: map['observaciones'] as String?,
       categoriasJson: (map['categorias_json'] ?? '[]').toString(),
+      version: (map['version'] as num?)?.toInt() ?? 0,
     );
   }
 

@@ -58,6 +58,9 @@ class CotizacionGuardada {
   final String archivoPdf;
   final List<ItemCotizacionGuardado> items;
 
+  /// Con servidor: la versión del registro cuando se leyó (ver [Requerimiento.version]).
+  final int version;
+
   CotizacionGuardada({
     this.id,
     required this.numero,
@@ -73,6 +76,7 @@ class CotizacionGuardada {
     required this.total,
     required this.archivoPdf,
     this.items = const [],
+    this.version = 0,
   });
 
   factory CotizacionGuardada.fromMap(Map<String, dynamic> map) {
@@ -103,6 +107,7 @@ class CotizacionGuardada {
       total: (map['total'] as num).toDouble(),
       archivoPdf: (map['archivo_pdf'] ?? '').toString(),
       items: items,
+      version: (map['version'] as num?)?.toInt() ?? 0,
     );
   }
 

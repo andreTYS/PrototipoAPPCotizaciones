@@ -37,6 +37,9 @@ class ChecklistHerramientas {
   final String? observacionesDevolucion;
   final String categoriasJson;
 
+  /// Con servidor: la versión del registro cuando se leyó (ver [Requerimiento.version]).
+  final int version;
+
   ChecklistHerramientas({
     this.id,
     required this.numero,
@@ -52,6 +55,7 @@ class ChecklistHerramientas {
     this.observaciones,
     this.observacionesDevolucion,
     required this.categoriasJson,
+    this.version = 0,
   });
 
   late final List<ChecklistCategoriaState> categorias = _conMarcasPorDefecto(soloMarcados(categoriasDesdeJson(categoriasJson)));
@@ -117,6 +121,7 @@ class ChecklistHerramientas {
       observaciones: observaciones ?? this.observaciones,
       observacionesDevolucion: observacionesDevolucion ?? this.observacionesDevolucion,
       categoriasJson: categoriasJson ?? this.categoriasJson,
+      version: version,
     );
   }
 
@@ -136,6 +141,7 @@ class ChecklistHerramientas {
       salidaConfirmadaPor: salidaConfirmadaPor,
       observaciones: observaciones ?? this.observaciones,
       categoriasJson: categoriasJson ?? this.categoriasJson,
+      version: version,
     );
   }
 
@@ -158,6 +164,7 @@ class ChecklistHerramientas {
       observaciones: map['observaciones'] as String?,
       observacionesDevolucion: map['observaciones_devolucion'] as String?,
       categoriasJson: (map['categorias_json'] ?? '[]').toString(),
+      version: (map['version'] as num?)?.toInt() ?? 0,
     );
   }
 

@@ -1,0 +1,23 @@
+{
+  "name": "icr-finanzas-api",
+  "version": "1.0.0",
+  "description": "API de referencia de Caja diaria y Caja chica (ICR Finanzas). Implementa el contrato de docs/API.md.",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "test": "tsx --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "pg": "^8.23.1",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2"
+  },
+  "private": true,
+  "type": "module"
+}

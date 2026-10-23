@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/almacen_state.dart';
+import '../state/auth_state.dart';
 import '../state/navegacion_state.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/brand_colors.dart';
@@ -23,6 +24,12 @@ class InicioScreen extends StatelessWidget {
 
   void _abrirRequerimiento(BuildContext context, int id) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => RequerimientoDetalleScreen(id: id)));
+  }
+
+  /// "Hola, Juan" con la sesión de servidor; "Hola," sin ella.
+  static String _saludo(BuildContext context) {
+    final nombre = context.read<AuthState>().usuario?.nombre.split(' ').first ?? '';
+    return nombre.isEmpty ? 'Hola,' : 'Hola, $nombre';
   }
 
   @override
@@ -80,7 +87,10 @@ class InicioScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 22),
-              const Text('Hola,', style: TextStyle(color: BrandColors.cian, fontWeight: FontWeight.w700, fontSize: 15)),
+              Text(
+                _saludo(context),
+                style: const TextStyle(color: BrandColors.cian, fontWeight: FontWeight.w700, fontSize: 15),
+              ),
               const SizedBox(height: 2),
               Text(
                 todoAlDia ? 'Todo está al día' : 'Esto requiere atención',

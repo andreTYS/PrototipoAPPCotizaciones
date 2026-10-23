@@ -32,6 +32,7 @@ class NotificacionesService {
   );
 
   static Future<void> inicializar() async {
+    if (kIsWeb) return; // En el navegador no hay notificaciones del celular.
     try {
       await _plugin.initialize(
         settings: const InitializationSettings(

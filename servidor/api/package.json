@@ -1,0 +1,18 @@
+{
+  "name": "cotizador-icr-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API compartida del Cotizador ICR (PostgreSQL)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "express": "^5.1.0",
+    "pg": "^8.13.1"
+  }
+}
