@@ -1,9 +1,14 @@
-# Cotizador ICR + Finanzas en un VPS: base de datos PostgreSQL + dos APIs + HTTPS automático.
-# Estructura esperada:  /opt/icr/servidor (esta carpeta) y /opt/icr/finanzas (al lado).
+# API compartida del Cotizador ICR (base de datos PostgreSQL + API Node),
+# adaptada para el VPS real de Inversiones ICR: ese VPS ya tiene Traefik
+# sirviendo HTTPS para el ERP, la tienda y el Cotizador web (todos bajo
+# n8n_default) — por eso acá NO hay Caddy ni se abren los puertos 80/443,
+# a diferencia del docker-compose.yml original de este módulo. El build web
+# (Flutter) y el finanzas-api/caddy de ese original no se tocan: los sirve
+# el docker-compose.yml de la raíz del repo y, aparte, ya hay un
+# finanzas.inversionesicr.com en producción (otro repo) — no se duplica acá.
 #   1) cp .env.example .env   y completa los valores
 #   2) docker compose up -d --build
-# Más detalles en DESPLIEGUE.md
-name: icr
+name: icr-cotizador-servidor
 
 services:
   db:
@@ -21,6 +26,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - interna
     # Sin "ports": la base solo se ve desde la API, nunca desde internet.
 
   api:
@@ -33,61 +40,49 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://icr:${POSTGRES_PASSWORD}@db:5432/cotizador
-      ADMIN_USUARIO: ${ADMIN_USUARIO:-admin}
-      ADMIN_CLAVE: ${ADMIN_CLAVE:?Falta ADMIN_CLAVE en el archivo .env}
+      # El ERP se llama por su dominio público, no por red interna de Docker
+      # (llamada servidor-a-servidor, no necesita unirse a la red del ERP).
+      ERP_API_URL: ${ERP_API_URL:-https://erp.inversionesicr.com/api}
       CLAVE_EDICION: ${CLAVE_EDICION:-1234}
       TZ: America/Lima
     volumes:
       - uploads:/app/uploads
-
-  # Finanzas (caja diaria y caja chica). Usa la MISMA base y los MISMOS usuarios y sesiones que la API de arriba:
-  # quien entra en la app entra aquí con el mismo usuario; su rol decide qué puede hacer.
-  finanzas-api:
-    build:
-      context: ../finanzas
-      dockerfile: api/Dockerfile
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      api:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://icr:${POSTGRES_PASSWORD}@db:5432/cotizador
-      MAIN_API_URL: http://api:3000
-      API_PREFIX: /api-caja
-      UPLOAD_DIR: /data/fotos
-      FINANZAS_ROLES: ${FINANZAS_ROLES:-}
-      FINANZAS_ROLES_CORREGIR: ${FINANZAS_ROLES_CORREGIR:-}
-      FINANZAS_ROLES_CERRAR: ${FINANZAS_ROLES_CERRAR:-}
-      FINANZAS_ROLES_REABRIR: ${FINANZAS_ROLES_REABRIR:-}
-      FINANZAS_ROLES_CONFIG: ${FINANZAS_ROLES_CONFIG:-}
-      FINANZAS_ROLES_REVISAR: ${FINANZAS_ROLES_REVISAR:-}
-      TZ: America/Lima
-    volumes:
-      - finanzas_fotos:/data/fotos
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    depends_on:
-      - api
-      - finanzas-api
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      DOMINIO: ${DOMINIO:?Falta DOMINIO en el archivo .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./web:/srv/web:ro
-      - ./finanzas-web:/srv/finanzas:ro
-      - caddy_data:/data
-      - caddy_config:/config
+    networks:
+      - interna
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      # Nombre REAL de la red de Docker (n8n_default), no un alias — mismo
+      # hallazgo que en ICR-TIENDA/ICR-LOGISTICA/el Cotizador web.
+      - "traefik.docker.network=n8n_default"
+      # Mismo dominio que ya usa la app web (cotizador.inversionesicr.com),
+      # NO un subdominio nuevo: /api y /uploads, como el resto del
+      # ecosistema. El Express de este backend ya espera el prefijo /api
+      # internamente (ver api/src/index.js: app.use('/api', crearRutas())) y
+      # /uploads lo sirve en la raíz, así que ninguna de las dos rutas
+      # necesita StripPrefix.
+      - "traefik.http.routers.icr-cotizador-srv.rule=Host(`${DOMAIN:-cotizador.inversionesicr.com}`) && (PathPrefix(`/api`) || PathPrefix(`/uploads`))"
+      - "traefik.http.routers.icr-cotizador-srv.entrypoints=websecure"
+      - "traefik.http.routers.icr-cotizador-srv.tls=true"
+      # "letsencrypt" no existe como certResolver en el Traefik de este VPS
+      # — el único definido es "mytlschallenge" (mismo hallazgo ya
+      # documentado). El certificado del dominio ya existe (lo emitió el
+      # router de la app web) — este router lo reusa, mismo dominio.
+      - "traefik.http.routers.icr-cotizador-srv.tls.certresolver=mytlschallenge"
+      # Bien alto a propósito: que no dependa de cómo calcule Traefik la
+      # prioridad automática del router Host-a-secas de la app web.
+      - "traefik.http.routers.icr-cotizador-srv.priority=999999"
+      - "traefik.http.services.icr-cotizador-srv.loadbalancer.server.port=3000"
 
 volumes:
   pgdata:
   uploads:
-  finanzas_fotos:
-  caddy_data:
-  caddy_config:
+
+networks:
+  # Red propia de este stack (Postgres <-> API) — no se expone a internet.
+  interna:
+  # Misma red compartida de Traefik que ya usan el ERP, la tienda, finanzas
+  # y el Cotizador web en este VPS (n8n_default) — no una red nueva.
+  traefik_public:
+    name: n8n_default
+    external: true

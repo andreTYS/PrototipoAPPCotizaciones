@@ -8,7 +8,11 @@ const DIAS_SESION = 30;
 const MINUTOS_EDICION = 15;
 
 // ---------------------------------------------------------------------------
-// Sesión
+// Sesión — las credenciales nunca se guardan acá: cada login se valida
+// contra el ERP real (el mismo /auth/login que ya usan el ERP web e
+// ICR-TIENDA) y, si dice que sí, se espeja el usuario localmente (upsert por
+// su id del ERP) solo para las foreign keys de bitacora/creado_por — nunca
+// la clave.
 // ---------------------------------------------------------------------------
 
 const intentos = new Map(); // ip -> { cuenta, desde }
@@ -29,16 +33,63 @@ function anotarFallo(ip) {
   intentos.set(ip, e);
 }
 
-export async function iniciarSesion(ip, usuario, clave, dispositivo) {
+// Mapea el rol_codigo real del ERP al rol simplificado que usa este backend.
+// Ajusta esta lista si en el ERP los códigos de rol son otros — se ve con
+// SELECT DISTINCT rol_codigo FROM usuarios en la base del ERP.
+function mapearRolErp(rolErp) {
+  switch (String(rolErp ?? '').toUpperCase()) {
+    case 'ADMIN': return 'admin';
+    case 'SUPERVISOR': return 'encargado';
+    case 'VENTAS': return 'vendedor';
+    case 'ALMACENERO': return 'almacen';
+    default: return 'empleado'; // cualquier empleado puede mandar requerimientos
+  }
+}
+
+async function validarContraErp(email, clave) {
+  const base = process.env.ERP_API_URL || 'https://erp.inversionesicr.com/api';
+  const controlador = new AbortController();
+  const vencido = setTimeout(() => controlador.abort(), 10_000);
+  let resp;
+  try {
+    resp = await fetch(`${base}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: clave }),
+      signal: controlador.signal,
+    });
+  } catch {
+    throw falla(503, 'No se pudo conectar con el ERP, intenta de nuevo.');
+  } finally {
+    clearTimeout(vencido);
+  }
+  const datos = await resp.json().catch(() => null);
+  if (!resp.ok || !datos?.data?.user) throw falla(401, 'Correo o clave incorrectos.');
+  return datos.data.user;
+}
+
+export async function iniciarSesion(ip, email, clave, dispositivo) {
   limitarIntentos(ip);
-  const { rows } = await consulta('SELECT * FROM usuarios WHERE lower(usuario) = lower($1)', [String(usuario ?? '').trim()]);
-  const u = rows[0];
-  const correcto = u && u.activo && (await bcrypt.compare(String(clave ?? ''), u.clave_hash));
-  if (!correcto) {
-    anotarFallo(ip);
-    throw falla(401, 'Usuario o clave incorrectos.');
+  const correo = String(email ?? '').trim();
+  let usuarioErp;
+  try {
+    usuarioErp = await validarContraErp(correo, clave);
+  } catch (e) {
+    if (e?.codigo === 401) anotarFallo(ip);
+    throw e;
   }
   intentos.delete(ip);
+  const id = Number(usuarioErp.usuario_id);
+  const nombre = String(usuarioErp.nombre_completo ?? correo);
+  const rol = mapearRolErp(usuarioErp.rol_codigo);
+  const { rows: filasU } = await consulta(
+    `INSERT INTO usuarios (id, usuario, nombre, clave_hash, rol, activo)
+     VALUES ($1, $2, $3, '', $4, TRUE)
+     ON CONFLICT (id) DO UPDATE SET usuario = EXCLUDED.usuario, nombre = EXCLUDED.nombre, rol = EXCLUDED.rol, activo = TRUE
+     RETURNING *`,
+    [id, correo.toLowerCase(), nombre, rol],
+  );
+  const u = filasU[0];
   await consulta('DELETE FROM sesiones WHERE expira_en < (now() AT TIME ZONE \'America/Lima\')');
   const token = randomBytes(32).toString('hex');
   await consulta(
@@ -129,52 +180,12 @@ export function exigirEdicion(req) {
 }
 
 // ---------------------------------------------------------------------------
-// Usuarios (administración)
+// Usuarios: ya no se administran acá — cada cuenta se espeja sola al entrar
+// con su correo y clave del ERP (ver iniciarSesion). Solo lectura, para ver
+// quién ha entrado.
 // ---------------------------------------------------------------------------
 
 export async function listarUsuarios() {
   const { rows } = await consulta('SELECT id, usuario, nombre, rol, activo FROM usuarios ORDER BY lower(nombre)');
   return rows;
-}
-
-export async function crearUsuario({ usuario, nombre, clave, rol }) {
-  const u = String(usuario ?? '').trim().toLowerCase();
-  if (!/^[a-z0-9._-]{3,60}$/.test(u)) throw falla(400, 'El usuario debe tener 3 a 60 caracteres: letras, números, punto, guion.');
-  if (String(nombre ?? '').trim() === '') throw falla(400, 'Escribe el nombre de la persona.');
-  if (String(clave ?? '').length < 6) throw falla(400, 'La clave debe tener al menos 6 caracteres.');
-  if (!ROLES.includes(rol)) throw falla(400, 'Rol no válido.');
-  if ((await consulta('SELECT 1 FROM usuarios WHERE lower(usuario) = $1', [u])).rowCount > 0) {
-    throw falla(409, 'Ese usuario ya existe.');
-  }
-  const { rows } = await consulta(
-    'INSERT INTO usuarios (usuario, nombre, clave_hash, rol) VALUES ($1, $2, $3, $4) RETURNING id, usuario, nombre, rol, activo',
-    [u, String(nombre).trim(), await bcrypt.hash(String(clave), 10), rol],
-  );
-  return rows[0];
-}
-
-export async function actualizarUsuario(id, { nombre, clave, rol, activo }, yoId) {
-  if (rol !== undefined && !ROLES.includes(rol)) throw falla(400, 'Rol no válido.');
-  if (clave !== undefined && String(clave).length < 6) throw falla(400, 'La clave debe tener al menos 6 caracteres.');
-  if (Number(id) === yoId && (activo === false || (rol !== undefined && rol !== 'admin'))) {
-    throw falla(400, 'No puedes quitarte el acceso ni el rol de administrador a ti mismo.');
-  }
-  const { rows } = await consulta(
-    `UPDATE usuarios SET
-       nombre = COALESCE($2, nombre),
-       clave_hash = COALESCE($3, clave_hash),
-       rol = COALESCE($4, rol),
-       activo = COALESCE($5, activo)
-     WHERE id = $1 RETURNING id, usuario, nombre, rol, activo`,
-    [id, nombre ?? null, clave === undefined ? null : await bcrypt.hash(String(clave), 10), rol ?? null, activo ?? null],
-  );
-  if (rows.length === 0) throw falla(404, 'No existe ese usuario.');
-  if (activo === false || clave !== undefined) await consulta('DELETE FROM sesiones WHERE usuario_id = $1', [id]);
-  return rows[0];
-}
-
-export async function cambiarMiClave(usuario, actual, nueva) {
-  if (!(await bcrypt.compare(String(actual ?? ''), usuario.clave_hash))) throw falla(403, 'La clave actual no es correcta.');
-  if (String(nueva ?? '').length < 6) throw falla(400, 'La clave nueva debe tener al menos 6 caracteres.');
-  await consulta('UPDATE usuarios SET clave_hash = $2 WHERE id = $1', [usuario.id, await bcrypt.hash(String(nueva), 10)]);
 }

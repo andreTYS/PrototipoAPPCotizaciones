@@ -10,9 +10,29 @@ import pg from 'pg';
 const admin = process.env.DATABASE_ADMIN_URL || 'postgres://postgres@localhost:5432/postgres';
 const nombreBase = `cotizador_test_${process.pid}`;
 process.env.DATABASE_URL = admin.replace(/\/[^/]*$/, `/${nombreBase}`);
-process.env.ADMIN_USUARIO = 'admin';
-process.env.ADMIN_CLAVE = 'admin-clave-1';
+process.env.ERP_API_URL = 'http://erp-falso.test/api';
 process.env.UPLOAD_DIR = mkdtempSync(join(tmpdir(), 'subidas-'));
+
+// El login ya no valida contra una tabla propia: llama al ERP real
+// (ver auth.js). Acá se finge esa respuesta para poder probar sin red —
+// la llamada local de `llamar()` abajo sigue yendo por el fetch de verdad.
+const usuariosErp = {
+  'admin@icr.test': { clave: 'admin-clave-1', usuario_id: 1, nombre_completo: 'Administrador', rol_codigo: 'ADMIN' },
+  'juan@icr.test': { clave: 'clave-segura', usuario_id: 2, nombre_completo: 'JUAN', rol_codigo: 'EMPLEADO' }, // código sin mapeo -> cae en "empleado"
+  'carlos@icr.test': { clave: 'clave-segura', usuario_id: 3, nombre_completo: 'CARLOS', rol_codigo: 'SUPERVISOR' },
+  'pedro@icr.test': { clave: 'clave-segura', usuario_id: 4, nombre_completo: 'PEDRO', rol_codigo: 'ALMACENERO' },
+  'ana@icr.test': { clave: 'clave-segura', usuario_id: 5, nombre_completo: 'ANA', rol_codigo: 'ALMACENERO' },
+  'vera@icr.test': { clave: 'clave-segura', usuario_id: 6, nombre_completo: 'VERA', rol_codigo: 'VENTAS' },
+  'temporal@icr.test': { clave: 'clave-segura', usuario_id: 7, nombre_completo: 'TEMPORAL', rol_codigo: 'VENTAS' },
+};
+const fetchDeVerdad = globalThis.fetch;
+globalThis.fetch = async (url, opciones) => {
+  if (!String(url).startsWith(process.env.ERP_API_URL)) return fetchDeVerdad(url, opciones);
+  const { email, password } = JSON.parse(opciones.body);
+  const u = usuariosErp[email];
+  if (!u || u.clave !== password) return new Response(JSON.stringify({ error: 'Credenciales inválidas' }), { status: 401 });
+  return new Response(JSON.stringify({ data: { user: u } }), { status: 200 });
+};
 
 const { crearApp } = await import('../src/index.js');
 const { prepararBase, pool } = await import('../src/db.js');
@@ -73,11 +93,11 @@ before(async () => {
     servidor = crearApp().listen(0, () => ok());
   });
   base = `http://127.0.0.1:${servidor.address().port}`;
-  sesiones.admin = await entrar('admin', 'admin-clave-1');
-  for (const [usuario, rol] of [['juan', 'empleado'], ['carlos', 'encargado'], ['pedro', 'almacen'], ['ana', 'almacen'], ['vera', 'vendedor'], ['fina', 'finanzas']]) {
-    const r = await llamar('POST', '/api/usuarios', { token: sesiones.admin, cuerpo: { usuario, nombre: usuario.toUpperCase(), clave: 'clave-segura', rol } });
-    assert.equal(r.estado, 201, JSON.stringify(r.datos));
-    sesiones[usuario] = await entrar(usuario, 'clave-segura');
+  // Cada cuenta se espeja sola al entrar con su correo del ERP (falso acá,
+  // ver usuariosErp arriba) — no hay un paso aparte para crearlas.
+  sesiones.admin = await entrar('admin@icr.test', 'admin-clave-1');
+  for (const correo of ['juan', 'carlos', 'pedro', 'ana', 'vera']) {
+    sesiones[correo] = await entrar(`${correo}@icr.test`, 'clave-segura');
   }
 });
 
@@ -92,26 +112,29 @@ after(async () => {
 
 describe('acceso', () => {
   it('rechaza claves incorrectas y pedidos sin sesión', async () => {
-    assert.equal((await llamar('POST', '/api/login', { cuerpo: { usuario: 'admin', clave: 'mala' } })).estado, 401);
+    assert.equal((await llamar('POST', '/api/login', { cuerpo: { usuario: 'admin@icr.test', clave: 'mala' } })).estado, 401);
     assert.equal((await llamar('GET', '/api/requerimientos')).estado, 401);
     assert.equal((await llamar('GET', '/api/requerimientos', { token: 'x'.repeat(64) })).estado, 401);
   });
 
-  it('solo el administrador gestiona usuarios', async () => {
+  it('el rol de cada cuenta viene del rol_codigo que manda el ERP', async () => {
     assert.equal((await llamar('GET', '/api/usuarios', { token: sesiones.juan })).estado, 403);
     const r = await llamar('GET', '/api/usuarios', { token: sesiones.admin });
     assert.equal(r.estado, 200);
-    assert.ok(r.datos.some((u) => u.usuario === 'carlos' && u.rol === 'encargado'));
-    assert.ok(r.datos.some((u) => u.usuario === 'fina' && u.rol === 'finanzas'));
-    assert.equal((await llamar('POST', '/api/usuarios', { token: sesiones.admin, cuerpo: { usuario: 'juan', nombre: 'x', clave: 'clave-segura', rol: 'empleado' } })).estado, 409);
+    assert.ok(r.datos.some((u) => u.usuario === 'carlos@icr.test' && u.rol === 'encargado'));
+    assert.ok(r.datos.some((u) => u.usuario === 'juan@icr.test' && u.rol === 'empleado'));
+    assert.ok(r.datos.some((u) => u.usuario === 'pedro@icr.test' && u.rol === 'almacen'));
+    assert.ok(r.datos.some((u) => u.usuario === 'vera@icr.test' && u.rol === 'vendedor'));
   });
 
-  it('un usuario desactivado pierde el acceso', async () => {
-    const r = await llamar('POST', '/api/usuarios', { token: sesiones.admin, cuerpo: { usuario: 'temporal', nombre: 'Temporal', clave: 'clave-segura', rol: 'empleado' } });
-    const token = await entrar('temporal', 'clave-segura');
-    await llamar('PUT', `/api/usuarios/${r.datos.id}`, { token: sesiones.admin, cuerpo: { activo: false } });
+  it('un usuario desactivado pierde el acceso (y vuelve a entrar si el ERP lo reactiva)', async () => {
+    const token = await entrar('temporal@icr.test', 'clave-segura');
+    await pool.query("UPDATE usuarios SET activo = FALSE WHERE usuario = 'temporal@icr.test'");
     assert.equal((await llamar('GET', '/api/yo', { token })).estado, 401);
-    assert.equal((await llamar('POST', '/api/login', { cuerpo: { usuario: 'temporal', clave: 'clave-segura' } })).estado, 401);
+    // El estado de la cuenta lo decide el ERP, no una bandera local: si la
+    // clave sigue siendo correcta, el próximo login la vuelve a activar.
+    const r = await llamar('POST', '/api/login', { cuerpo: { usuario: 'temporal@icr.test', clave: 'clave-segura' } });
+    assert.equal(r.estado, 200);
   });
 });
 

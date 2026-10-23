@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import express, { Router } from 'express';
 import {
-  actualizarUsuario, cambiarClaveEdicion, cambiarMiClave, cerrarSesion, crearUsuario, exigirRol, exigirSesion,
+  cambiarClaveEdicion, cerrarSesion, exigirRol, exigirSesion,
   iniciarSesion, listarUsuarios, publico, verificarClaveEdicion,
 } from './auth.js';
 import { consulta, enTransaccion } from './db.js';
@@ -48,6 +48,8 @@ export function crearRutas() {
     res.json({ ok: true });
   });
 
+  // "usuario" es el correo del ERP: el login se valida contra el ERP real
+  // (ver iniciarSesion en auth.js), no contra una clave guardada acá.
   r.post('/login', async (req, res) => {
     res.json(await iniciarSesion(req.ip, req.body?.usuario, req.body?.clave, req.get('user-agent')));
   });
@@ -62,27 +64,13 @@ export function crearRutas() {
     res.json({ ok: true });
   });
   r.get('/yo', (req, res) => res.json(publico(req.usuario)));
-  r.post('/yo/clave', async (req, res) => {
-    await cambiarMiClave(req.usuario, req.body?.actual, req.body?.nueva);
-    res.json({ ok: true });
-  });
 
-  // Usuarios (solo administrador)
+  // Usuarios: solo lectura — cada cuenta se espeja sola al entrar con su
+  // correo y clave del ERP (ver iniciarSesion en auth.js), no se crean ni
+  // editan desde acá.
   r.get('/usuarios', async (req, res) => {
     exigirRol(req.usuario, 'ver los usuarios');
     res.json(await listarUsuarios());
-  });
-  r.post('/usuarios', async (req, res) => {
-    exigirRol(req.usuario, 'crear usuarios');
-    const u = await crearUsuario(req.body ?? {});
-    await bitacora(req, 'crear', 'usuarios', u.id, `${u.usuario} (${u.rol})`);
-    res.status(201).json(u);
-  });
-  r.put('/usuarios/:id', async (req, res) => {
-    exigirRol(req.usuario, 'cambiar usuarios');
-    const u = await actualizarUsuario(entero(req.params.id), req.body ?? {}, req.usuario.id);
-    await bitacora(req, 'editar', 'usuarios', u.id, `${u.usuario} (${u.rol}${u.activo ? '' : ', desactivado'})`);
-    res.json(u);
   });
 
   // Clave de edición

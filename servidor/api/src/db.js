@@ -76,21 +76,7 @@ export async function prepararBase() {
     await consulta("INSERT INTO configuracion (clave, valor) VALUES ('clave_edicion', $1)", [hash]);
   }
 
-  // Primer administrador.
-  if ((await consulta('SELECT 1 FROM usuarios LIMIT 1')).rowCount === 0) {
-    const usuario = process.env.ADMIN_USUARIO || 'admin';
-    let clave = process.env.ADMIN_CLAVE;
-    if (!clave) {
-      clave = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
-      console.log('==========================================================');
-      console.log(`  No se definió ADMIN_CLAVE. Administrador creado:`);
-      console.log(`  usuario: ${usuario}   clave: ${clave}`);
-      console.log('  Entra y cámbiala de inmediato.');
-      console.log('==========================================================');
-    }
-    await consulta(
-      "INSERT INTO usuarios (usuario, nombre, clave_hash, rol) VALUES ($1, $2, $3, 'admin')",
-      [usuario, 'Administrador', await bcrypt.hash(clave, 10)],
-    );
-  }
+  // No hay administrador que crear acá: cada cuenta se espeja sola la
+  // primera vez que esa persona entra con su correo y clave del ERP (ver
+  // iniciarSesion en auth.js).
 }
