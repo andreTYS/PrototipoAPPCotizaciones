@@ -9,12 +9,14 @@ services:
       - traefik_public
     labels:
       - "traefik.enable=true"
-      # Debe ser el nombre REAL de la red de Docker (n8n_default), no el
+      # Debe ser el nombre REAL de la red de Docker (traefik-network), no el
       # alias "traefik_public" que solo existe dentro de este compose — con
       # el alias, Traefik nunca encuentra la red y el dominio se queda sin
-      # certificado real (sirve el autofirmado por defecto). Mismo hallazgo
-      # que en ICR-TIENDA/docker-compose.yml.
-      - "traefik.docker.network=n8n_default"
+      # certificado real (sirve el autofirmado por defecto). El Traefik
+      # activo del VPS es traefik-n0do-traefik-1 (proyecto traefik-n0do),
+      # NO el de n8n_default (ese quedó huérfano, sin red real conectada —
+      # revisado oct. 2026, logs de n8n-traefik-1 lo confirman).
+      - "traefik.docker.network=traefik-network"
       # HTTP -> HTTPS redirect
       - "traefik.http.routers.cotizador-icr-http.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.cotizador-icr-http.entrypoints=web"
@@ -24,15 +26,16 @@ services:
       - "traefik.http.routers.cotizador-icr.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.cotizador-icr.entrypoints=websecure"
       - "traefik.http.routers.cotizador-icr.tls=true"
-      # "letsencrypt" no existe como certResolver en el Traefik de este
-      # VPS — el único definido es "mytlschallenge" (ver docker-compose.yml
-      # de ICR-TIENDA para el mismo hallazgo).
-      - "traefik.http.routers.cotizador-icr.tls.certresolver=mytlschallenge"
+      # "mytlschallenge" ya no existe como certResolver — el Traefik activo
+      # (traefik-n0do) solo tiene definido "letsencrypt" (ver command: de su
+      # propio docker-compose.yml en /docker/traefik-n0do).
+      - "traefik.http.routers.cotizador-icr.tls.certresolver=letsencrypt"
       - "traefik.http.services.cotizador-icr.loadbalancer.server.port=80"
 
 networks:
-  # Misma red compartida de Traefik que ya usan el ERP y la tienda en este
-  # VPS (n8n_default) — no una red "traefik_public" separada.
+  # Red del Traefik que de verdad sirve 80/443 en este VPS (proyecto
+  # traefik-n0do, no el de n8n_default) — no una red "traefik_public"
+  # separada.
   traefik_public:
-    name: n8n_default
+    name: traefik-network
     external: true

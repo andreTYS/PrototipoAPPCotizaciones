@@ -42,13 +42,13 @@ services:
       - traefik_public
     labels:
       - "traefik.enable=true"
-      # Debe ser el nombre REAL de la red de Docker (n8n_default), no el
+      # Debe ser el nombre REAL de la red de Docker (traefik-network), no el
       # alias "traefik_public" que solo existe dentro de este compose — con
       # el alias, Traefik no encuentra la red cuando el contenedor tiene más
-      # de una (acá tiene icr_cotizador_internal + esta). Mismo hallazgo que
-      # en ICR-TIENDA y en el Cotizador web (docker-compose.yml de
-      # prototipoappcotizaciones).
-      - "traefik.docker.network=n8n_default"
+      # de una (acá tiene icr_cotizador_internal + esta). El Traefik activo
+      # del VPS es traefik-n0do-traefik-1, no el de n8n_default (huérfano,
+      # sin red real conectada — revisado oct. 2026).
+      - "traefik.docker.network=traefik-network"
       # Mismo dominio que ya usa la app (cotizador.inversionesicr.com), NO un
       # subdominio nuevo: esto va por /api, como el resto del ecosistero. El
       # contenedor del build web (prototipoappcotizaciones/docker-compose.yml)
@@ -59,15 +59,15 @@ services:
       # El StripPrefix saca el /api antes de pasarle la ruta al PHP, que vive
       # en la raíz del contenedor (requerimientos.php, no /api/requerimientos.php).
       - "traefik.http.middlewares.icr-cotizador-api-stripprefix.stripprefix.prefixes=/api"
-      # HTTPS — "letsencrypt" no existe como certResolver en el Traefik de
-      # este VPS, el único definido es "mytlschallenge" (mismo hallazgo
-      # documentado en ICR-TIENDA y en el Cotizador web). El certificado de
-      # cotizador.inversionesicr.com ya existe (lo emitió el router de la app
-      # web) — Traefik lo reusa para este router también, mismo dominio.
+      # HTTPS — "mytlschallenge" ya no existe como certResolver; el Traefik
+      # activo (traefik-n0do) solo tiene definido "letsencrypt". El
+      # certificado de cotizador.inversionesicr.com ya existe (lo emitió el
+      # router de la app web) — Traefik lo reusa para este router también,
+      # mismo dominio.
       - "traefik.http.routers.icr-cotizador-api.rule=Host(`${DOMAIN:-cotizador.inversionesicr.com}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.icr-cotizador-api.entrypoints=websecure"
       - "traefik.http.routers.icr-cotizador-api.tls=true"
-      - "traefik.http.routers.icr-cotizador-api.tls.certresolver=mytlschallenge"
+      - "traefik.http.routers.icr-cotizador-api.tls.certresolver=letsencrypt"
       # Bien alto a propósito: si el router de la app (Host a secas, sin
       # prioridad explícita) calcula su prioridad automática por longitud de
       # regla, en algunas versiones de Traefik ese número automático puede
@@ -85,8 +85,8 @@ networks:
   # Red propia de este stack (Postgres <-> backend) — no se expone a
   # internet ni se comparte con otros stacks del VPS.
   icr_cotizador_internal:
-  # Misma red compartida de Traefik que ya usan el ERP, la tienda y el
-  # Cotizador web en este VPS (n8n_default) — no una red nueva.
+  # Red del Traefik que de verdad sirve 80/443 en este VPS (proyecto
+  # traefik-n0do) — no una red nueva.
   traefik_public:
-    name: n8n_default
+    name: traefik-network
     external: true
